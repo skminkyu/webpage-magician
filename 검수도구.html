@@ -319,14 +319,19 @@ function resetKey() { document.getElementById('okey').value=''; document.getElem
 document.getElementById('okey').addEventListener('keydown', e => { if(e.key==='Enter') go(); });
 
 // ─── Anthropic API 호출 ──────────────────────────────────
-async function callAPI(messages, maxTokens=2000) {
+async function callAPI(messages, maxTokens=4000) {
   const res = await fetch('/api', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ model:'claude-opus-4-8', max_tokens: maxTokens, messages })
   });
   const d = await res.json();
-  if (!res.ok) throw new Error(d.error || `API 오류 ${res.status}`);
+  if (!res.ok) {
+    // Anthropic 에러 형식: {type:"error", error:{type:..., message:...}}
+    const errMsg = (typeof d.error === 'object' ? d.error?.message : d.error)
+      || d.message || `API 오류 ${res.status}`;
+    throw new Error(errMsg);
+  }
   return (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
 }
 
@@ -340,34 +345,32 @@ function parseJSON(raw) {
   return JSON.parse(s.slice(start, end+1));
 }
 
-// ─── 이미지 압축 (텍스트 읽기 최적화) ────────────────────
+// ─── 이미지 압축 (OCR 최적화: 텍스트 선명 + 파일 크기 최소화) ─
 function compressImage(dataUrl, origW, origH) {
   return new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
-      // 긴 세로 이미지(상세페이지)는 가로 1200px 유지, 짧은 이미지는 1500px
-      const MAX_W = origH > origW * 2 ? 1200 : 1500;
-      const MAX_H = 8000; // 세로 최대
+      // 가로 최대 1000px (Anthropic 권장 OCR 크기)
+      const MAX_W = 1000;
+      const MAX_H = 6000;
       let W = origW, H = origH;
       if (W > MAX_W) { H = Math.round(H * MAX_W / W); W = MAX_W; }
       if (H > MAX_H) { W = Math.round(W * MAX_H / H); H = MAX_H; }
-
-      // 너무 작으면 원본 유지
-      W = Math.max(W, 400); H = Math.max(H, 400);
+      W = Math.max(W, 300); H = Math.max(H, 300);
 
       const canvas = document.createElement('canvas');
       canvas.width = W; canvas.height = H;
       canvas.getContext('2d').drawImage(img, 0, 0, W, H);
 
-      // 품질 조절 — 파일 크기 5MB 이하로
-      let quality = 0.92;
+      // 목표: base64 길이 1MB 이하 (약 750KB 이진)
+      let quality = 0.88;
       let b64, sz;
       do {
         const url = canvas.toDataURL('image/jpeg', quality);
         b64 = url.split(',')[1];
         sz = b64.length;
-        quality -= 0.08;
-      } while (sz > 4500000 && quality > 0.3);
+        quality -= 0.1;
+      } while (sz > 1000000 && quality > 0.2);
 
       resolve({ b64, w: W, h: H, sz });
     };
@@ -552,10 +555,13 @@ async function inspectImage(img) {
   D.busy = false; setBusy(false);
   renderImageList();
   if (D.currentId === img.id) {
-    showResult(img);
-    if (img.result) drawVio(img.result.violations||[]);
-    const cnt = (img.result?.violations||[]).length;
-    setSt(cnt > 0 ? `검수 완료 — ${cnt}개 위반 문구 발견` : '검수 완료 — 위반 문구 없음', false);
+    if (img.result) {
+      showResult(img);
+      drawVio(img.result.violations||[]);
+      const cnt = (img.result.violations||[]).length;
+      setSt(cnt > 0 ? `검수 완료 — ${cnt}개 위반 문구 발견` : '검수 완료 — 위반 문구 없음', false);
+    }
+    // img.result가 null이면 showError가 이미 표시 중이므로 덮어쓰지 않음
   }
 }
 
@@ -564,70 +570,55 @@ async function inspectImageCore(img) {
   if (allPhrases.length === 0) { setSt('금지단어사전에 문구가 없습니다.', false); img.status='pending'; return; }
 
   try {
-    // ── 1단계: OCR (이미지 → 텍스트 추출만) ──────────────
-    setSt(`압축 중... (${img.name})`, true);
+    // ── 1단계: 이미지 압축 ────────────────────────────────
+    setSt(`이미지 준비 중... (${img.name})`, true);
     const { b64, w, h, sz } = await compressImage(img.dataUrl, img.w, img.h);
     setSt(`OCR 중... (${w}×${h}px, ${(sz/1024).toFixed(0)}KB)`, true);
 
-    const ocrPrompt = `이미지에 있는 모든 텍스트를 빠짐없이 그대로 추출해 주세요.
-
-규칙:
-- 이미지에 보이는 텍스트를 전부 추출합니다. 위에서 아래, 왼쪽에서 오른쪽 순서로.
-- 줄바꿈은 \\n으로 표현합니다.
-- 텍스트 이외의 설명, 주석, 해석은 절대 추가하지 마세요.
-- 텍스트만 출력하세요. 다른 내용 없이.`;
-
+    // ── 2단계: OCR (텍스트 추출만) ───────────────────────
     const ocrRaw = await callAPI([{
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-        { type: 'text', text: ocrPrompt }
+        { type: 'text', text: '이 이미지에 있는 모든 텍스트를 빠짐없이 추출하세요. 텍스트만 출력하고 다른 설명은 절대 추가하지 마세요.' }
       ]
-    }], 2000);
+    }], 4000);
 
     const extractedText = ocrRaw.trim();
-    if (!extractedText) throw new Error('텍스트를 추출하지 못했습니다.');
+    if (!extractedText) throw new Error('이미지에서 텍스트를 추출하지 못했습니다.');
 
-    // ── 2단계: JS 문자열 매칭 (AI 판단 없음, 100% 정확) ──
+    // ── 3단계: JS 문자열 매칭 (AI 판단 없음, 100% 정확) ──
     setSt('금칙어 매칭 중...', true);
     const violations = [];
-    const lines = extractedText.split(/\n/);
+    const lines = extractedText.split('\n');
 
-    // 선택된 카테고리에 맞는 사전 구성
     const sel = document.getElementById('activecat').value;
-    let dictEntries;
-    if (sel === '__all__') {
-      dictEntries = Object.entries(D.dict);
-    } else {
-      dictEntries = D.dict[sel] ? [[sel, D.dict[sel]]] : [];
-    }
+    const dictEntries = sel === '__all__'
+      ? Object.entries(D.dict)
+      : (D.dict[sel] ? [[sel, D.dict[sel]]] : []);
+
+    // 공백 제거한 전체 텍스트로 검색
+    const normalFull = extractedText.replace(/\s/g, '');
 
     for (const [category, phrases] of dictEntries) {
       for (const phrase of phrases) {
-        // 이미지 전체 텍스트(공백 무시)에서 금칙어 검색
-        const fullText = extractedText;
-        const normalFull = fullText.replace(/\s/g, '');
         const normalPhrase = phrase.replace(/\s/g, '');
-
+        if (!normalPhrase) continue;
         if (normalFull.includes(normalPhrase)) {
-          // 어느 줄에 있는지 찾기
-          const matchedLine = lines.find(line => line.replace(/\s/g, '').includes(normalPhrase)) || phrase;
-
-          // 이미 같은 금칙어 위반이 없을 때만 추가
-          if (!violations.find(v => v.forbidden_phrase === phrase)) {
-            violations.push({
-              category,
-              forbidden_phrase: phrase,
-              actual_text: matchedLine.trim(),
-              location: { x: 0, y: 0, width: 80, height: 5 },
-              reason: `금지 단어 "${phrase}" 포함`,
-            });
-          }
+          if (violations.find(v => v.forbidden_phrase === phrase)) continue;
+          const matchedLine = lines.find(l => l.replace(/\s/g, '').includes(normalPhrase)) || '';
+          violations.push({
+            category,
+            forbidden_phrase: phrase,
+            actual_text: matchedLine.trim() || phrase,
+            location: { x: 0, y: 0, width: 80, height: 5 },
+            reason: `금지 단어 "${phrase}" 포함`,
+          });
         }
       }
     }
 
-    const result = {
+    img.result = {
       violations,
       total_count: violations.length,
       clean: violations.length === 0,
@@ -636,14 +627,14 @@ async function inspectImageCore(img) {
         : `총 ${violations.length}건의 금지 문구가 발견되었습니다.`,
       ocr_text: extractedText,
     };
-
-    img.result = result;
     img.status = 'done';
   } catch(e) {
     img.status = 'pending';
     img.result = null;
-    if (D.currentId === img.id) showError(e.message);
-    setSt('오류: ' + e.message, false);
+    const msg = e.message || String(e);
+    if (D.currentId === img.id) showError(msg);
+    setSt('❌ 오류: ' + msg, false);
+    console.error('[검수오류]', e);
   }
 }
 

@@ -1,5 +1,7 @@
 const http = require('http');
 const https = require('https');
+const net = require('net');
+const tls = require('tls');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
@@ -7,14 +9,99 @@ const url = require('url');
 const PORT = 8080;
 const KEY_FILE = path.join(__dirname, 'apikey.txt');
 
+// 사내 프록시 자동 감지 (환경변수 또는 proxy.txt 파일)
+function getProxy() {
+  const envProxy = process.env.HTTPS_PROXY || process.env.https_proxy ||
+                   process.env.HTTP_PROXY  || process.env.http_proxy  || '';
+  if (envProxy) return envProxy;
+  const proxyFile = path.join(__dirname, 'proxy.txt');
+  if (fs.existsSync(proxyFile)) return fs.readFileSync(proxyFile, 'utf8').trim();
+  return '';
+}
+
 const MIME = {
   '.html': 'text/html; charset=utf-8',
-  '.js': 'text/javascript',
-  '.css': 'text/css',
-  '.jpg': 'image/jpeg',
-  '.png': 'image/png',
+  '.js':   'text/javascript',
+  '.css':  'text/css',
+  '.jpg':  'image/jpeg',
+  '.png':  'image/png',
 };
 
+// Anthropic API 호출 (프록시 CONNECT 터널 자동 지원)
+function callAnthropic(apiKey, payload, callback) {
+  const proxyStr = getProxy();
+
+  const reqHeaders = {
+    'Content-Type':       'application/json',
+    'Content-Length':     payload.length,
+    'x-api-key':          apiKey,
+    'anthropic-version':  '2023-06-01',
+  };
+
+  function doRequest(socket) {
+    const options = {
+      hostname: 'api.anthropic.com',
+      path:     '/v1/messages',
+      method:   'POST',
+      headers:  reqHeaders,
+      rejectUnauthorized: false,
+    };
+    if (socket) options.socket = socket;
+
+    const apiReq = https.request(options, apiRes => {
+      let data = '';
+      apiRes.on('data', d => data += d);
+      apiRes.on('end', () => callback(null, apiRes.statusCode, data));
+    });
+    apiReq.on('error', e => callback(e));
+    apiReq.write(payload);
+    apiReq.end();
+  }
+
+  if (!proxyStr) {
+    doRequest(null);
+    return;
+  }
+
+  // 프록시 CONNECT 터널
+  let proxyHost, proxyPort;
+  try {
+    const pu = new URL(proxyStr.includes('://') ? proxyStr : 'http://' + proxyStr);
+    proxyHost = pu.hostname;
+    proxyPort = parseInt(pu.port) || 8080;
+  } catch(e) {
+    console.error('proxy.txt 형식 오류:', e.message);
+    doRequest(null);
+    return;
+  }
+
+  const conn = net.connect(proxyPort, proxyHost, () => {
+    conn.write(`CONNECT api.anthropic.com:443 HTTP/1.1\r\nHost: api.anthropic.com:443\r\nProxy-Connection: keep-alive\r\n\r\n`);
+  });
+
+  let headerBuf = '';
+  const onData = chunk => {
+    headerBuf += chunk.toString('binary');
+    if (!headerBuf.includes('\r\n\r\n')) return;
+    conn.removeListener('data', onData);
+
+    if (!/^HTTP\/1\.[01] 200/i.test(headerBuf)) {
+      conn.destroy();
+      callback(new Error('프록시 CONNECT 실패: ' + headerBuf.slice(0, 120)));
+      return;
+    }
+
+    const tlsSock = tls.connect({ socket: conn, servername: 'api.anthropic.com', rejectUnauthorized: false }, () => {
+      doRequest(tlsSock);
+    });
+    tlsSock.on('error', e => callback(e));
+  };
+
+  conn.on('data', onData);
+  conn.on('error', e => callback(e));
+}
+
+// ─── HTTP 서버 ────────────────────────────────────────────
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -30,7 +117,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { key } = JSON.parse(body);
-        fs.writeFileSync(KEY_FILE, key.trim());
+        fs.writeFileSync(KEY_FILE, key.replace(/\s/g, ''));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
@@ -60,32 +147,15 @@ const server = http.createServer((req, res) => {
     req.on('data', d => body += d);
     req.on('end', () => {
       const payload = Buffer.from(body, 'utf8');
-      const options = {
-        hostname: 'api.anthropic.com',
-        path: '/v1/messages',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': payload.length,
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        rejectUnauthorized: false, // 사내 프록시 SSL 우회
-      };
-      const apiReq = https.request(options, apiRes => {
-        let data = '';
-        apiRes.on('data', d => data += d);
-        apiRes.on('end', () => {
-          res.writeHead(apiRes.statusCode, { 'Content-Type': 'application/json' });
-          res.end(data);
-        });
+      callAnthropic(apiKey, payload, (err, statusCode, data) => {
+        if (err) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: err.message }));
+          return;
+        }
+        res.writeHead(statusCode, { 'Content-Type': 'application/json' });
+        res.end(data);
       });
-      apiReq.on('error', e => {
-        res.writeHead(500, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      });
-      apiReq.write(payload);
-      apiReq.end();
     });
     return;
   }
@@ -104,8 +174,11 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
+  const proxy = getProxy();
   console.log('');
   console.log('  ✅ 상세페이지 검수 도구 서버 실행 중');
+  if (proxy) console.log(`  🔗 프록시 사용: ${proxy}`);
+  else       console.log('  🌐 직접 연결 모드 (프록시 없음)');
   console.log('');
   console.log(`  브라우저 주소: http://localhost:${PORT}`);
   console.log('');

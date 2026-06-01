@@ -564,53 +564,79 @@ async function inspectImageCore(img) {
   if (allPhrases.length === 0) { setSt('금지단어사전에 문구가 없습니다.', false); img.status='pending'; return; }
 
   try {
+    // ── 1단계: OCR (이미지 → 텍스트 추출만) ──────────────
     setSt(`압축 중... (${img.name})`, true);
     const { b64, w, h, sz } = await compressImage(img.dataUrl, img.w, img.h);
-    setSt(`AI 분석 중... (${w}×${h}px, ${(sz/1024).toFixed(0)}KB)`, true);
+    setSt(`OCR 중... (${w}×${h}px, ${(sz/1024).toFixed(0)}KB)`, true);
 
-    const dictText = dictTxt();
-    const prompt = `당신은 한국 전자상거래 상품 상세페이지(웹기술서) 금지문구 검수 담당자입니다.
+    const ocrPrompt = `이미지에 있는 모든 텍스트를 빠짐없이 그대로 추출해 주세요.
 
-[핵심 규칙 — 반드시 준수]
-- 금지 문구가 이미지 텍스트 어딘가에 포함되어 있으면, 문맥·의미·이유와 상관없이 무조건 위반으로 기록합니다.
-- "식물 재생", "자가 재생", "세포 재생" 처럼 금지 단어가 다른 단어와 결합된 경우도 위반입니다.
-- "이 맥락에서는 괜찮다", "과학적 설명이므로 허용" 같은 판단을 절대 하지 마세요.
-- 금지 단어가 텍스트에 존재하면 = 위반. 단순 포함 여부만 확인합니다.
+규칙:
+- 이미지에 보이는 텍스트를 전부 추출합니다. 위에서 아래, 왼쪽에서 오른쪽 순서로.
+- 줄바꿈은 \\n으로 표현합니다.
+- 텍스트 이외의 설명, 주석, 해석은 절대 추가하지 마세요.
+- 텍스트만 출력하세요. 다른 내용 없이.`;
 
-금지 문구 사전:
-${dictText}
-
-검수 절차:
-1. 이미지 속 모든 텍스트를 위에서 아래로 한 줄씩 읽습니다.
-2. 각 줄에서 금지 문구 사전의 단어/구문이 포함되어 있는지 확인합니다.
-3. 포함되어 있으면 해당 줄 전체를 actual_text에 기록하고 violations에 추가합니다.
-4. 위반이 전혀 없을 때만 clean: true로 설정합니다.
-
-반드시 아래 JSON 형식으로만 응답하세요. 마크다운, 설명 없이 순수 JSON만:
-{
-  "violations": [
-    {
-      "category": "카테고리명",
-      "forbidden_phrase": "금지단어사전 원본 문구",
-      "actual_text": "금지 단어가 포함된 이미지 속 실제 문장 전체",
-      "location": {"x": 0~100, "y": 0~100, "width": 0~100, "height": 0~10},
-      "reason": "금지 사유 한 줄"
-    }
-  ],
-  "total_count": 숫자,
-  "clean": true또는false,
-  "summary": "전체 검수 결과 요약 한 문장"
-}`;
-
-    const raw = await callAPI([{
+    const ocrRaw = await callAPI([{
       role: 'user',
       content: [
         { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-        { type: 'text', text: prompt }
+        { type: 'text', text: ocrPrompt }
       ]
     }], 2000);
 
-    const result = parseJSON(raw);
+    const extractedText = ocrRaw.trim();
+    if (!extractedText) throw new Error('텍스트를 추출하지 못했습니다.');
+
+    // ── 2단계: JS 문자열 매칭 (AI 판단 없음, 100% 정확) ──
+    setSt('금칙어 매칭 중...', true);
+    const violations = [];
+    const lines = extractedText.split(/\n/);
+
+    // 선택된 카테고리에 맞는 사전 구성
+    const sel = document.getElementById('activecat').value;
+    let dictEntries;
+    if (sel === '__all__') {
+      dictEntries = Object.entries(D.dict);
+    } else {
+      dictEntries = D.dict[sel] ? [[sel, D.dict[sel]]] : [];
+    }
+
+    for (const [category, phrases] of dictEntries) {
+      for (const phrase of phrases) {
+        // 이미지 전체 텍스트(공백 무시)에서 금칙어 검색
+        const fullText = extractedText;
+        const normalFull = fullText.replace(/\s/g, '');
+        const normalPhrase = phrase.replace(/\s/g, '');
+
+        if (normalFull.includes(normalPhrase)) {
+          // 어느 줄에 있는지 찾기
+          const matchedLine = lines.find(line => line.replace(/\s/g, '').includes(normalPhrase)) || phrase;
+
+          // 이미 같은 금칙어 위반이 없을 때만 추가
+          if (!violations.find(v => v.forbidden_phrase === phrase)) {
+            violations.push({
+              category,
+              forbidden_phrase: phrase,
+              actual_text: matchedLine.trim(),
+              location: { x: 0, y: 0, width: 80, height: 5 },
+              reason: `금지 단어 "${phrase}" 포함`,
+            });
+          }
+        }
+      }
+    }
+
+    const result = {
+      violations,
+      total_count: violations.length,
+      clean: violations.length === 0,
+      summary: violations.length === 0
+        ? '금지 문구가 발견되지 않았습니다.'
+        : `총 ${violations.length}건의 금지 문구가 발견되었습니다.`,
+      ocr_text: extractedText,
+    };
+
     img.result = result;
     img.status = 'done';
   } catch(e) {
@@ -672,6 +698,10 @@ function showResult(img) {
     <div class="stat"><div class="statl">검수 파일</div><div class="statv s">${eh(sl)}</div></div>
   </div>`;
   if (result.summary) html += `<p class="sumtxt">${eh(result.summary)}</p>`;
+  if (result.ocr_text) {
+    const short = result.ocr_text.length > 300 ? result.ocr_text.slice(0,300)+'…' : result.ocr_text;
+    html += `<details style="margin-bottom:9px"><summary style="font-size:10px;color:var(--tx3);cursor:pointer;padding:4px 0">▶ 추출된 텍스트 보기</summary><pre style="font-size:10px;color:var(--tx2);background:var(--bg3);border:1px solid var(--bd);border-radius:5px;padding:8px;margin-top:5px;white-space:pre-wrap;word-break:break-all">${eh(result.ocr_text)}</pre></details>`;
+  }
   if (vs.length === 0) {
     html += `<div class="cleanbox">✅ 금지 문구가 발견되지 않았습니다.</div>`;
   } else {

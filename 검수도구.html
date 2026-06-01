@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>상세페이지 금지문구 검수 도구</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d14;--bg2:#13131e;--bg3:#1a1a28;
+  --bd:#252538;--bd2:#1d1d2c;
+  --tx:#e2e2f0;--tx2:#7a7a9e;--tx3:#3a3a5a;
+  --red:#e03535;--rbg:rgba(224,53,53,.1);--rbd:rgba(224,53,53,.28);
+  --grn:#3db87a;--blu:#4a7eff;--ylw:#f59e0b;
+  --f:'Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+  --m:'Consolas','SF Mono',monospace;
+}
+body{font-family:var(--f);background:var(--bg);color:var(--tx);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* 오버레이 */
+#overlay{position:fixed;inset:0;background:rgba(10,10,18,.97);display:flex;align-items:center;justify-content:center;z-index:999}
+.obox{background:var(--bg2);border:1px solid var(--bd);border-radius:16px;padding:44px 52px;width:520px;text-align:center}
+.oico{width:54px;height:54px;background:var(--red);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 22px}
+.oico svg{width:30px;height:30px}
+.otitle{font-size:24px;font-weight:700;margin-bottom:8px}
+.odesc{font-size:13px;color:var(--tx2);line-height:1.65;margin-bottom:30px}
+.olbl{font-size:11px;font-weight:700;color:var(--tx2);display:block;text-align:left;margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase}
+.oinp{width:100%;background:var(--bg3);border:1.5px solid var(--bd);border-radius:10px;padding:13px 16px;font-size:14px;color:var(--tx);outline:none;font-family:var(--m);margin-bottom:12px;transition:border-color .2s}
+.oinp:focus{border-color:var(--blu)}
+.oinp::placeholder{color:var(--tx3)}
+.obtn{width:100%;background:var(--red);border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;color:#fff;cursor:pointer;transition:opacity .15s}
+.obtn:hover{opacity:.88}
+.obtn:disabled{opacity:.4;cursor:not-allowed}
+.oerr{font-size:12px;color:var(--red);padding:9px 12px;background:var(--rbg);border:1px solid var(--rbd);border-radius:8px;text-align:left;line-height:1.5;margin-bottom:10px;display:none}
+.ohint{font-size:11px;color:var(--tx3);margin-top:18px;line-height:1.8}
+.ohint a{color:var(--blu);text-decoration:none}
+.ohint a:hover{text-decoration:underline}
+
+/* 헤더 */
+.hdr{height:50px;background:var(--bg2);border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;padding:0 18px;flex-shrink:0}
+.hico2{width:26px;height:26px;background:var(--red);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.hico2 svg{width:14px;height:14px}
+.htx{display:flex;align-items:center;gap:8px}
+.htitle{font-size:13px;font-weight:600}
+.hsub{font-size:11px;color:var(--tx3)}
+.hkey{font-size:11px;background:rgba(74,126,255,.12);color:var(--blu);border:1px solid rgba(74,126,255,.22);border-radius:8px;padding:3px 10px;font-family:var(--m)}
+.hchg{font-size:11px;color:var(--tx3);background:none;border:1px solid var(--bd);border-radius:6px;padding:3px 9px;cursor:pointer}
+.hchg:hover{color:var(--tx2)}
+
+/* 레이아웃 */
+.wrap{display:grid;grid-template-columns:290px 1fr;flex:1;overflow:hidden;height:calc(100vh - 50px)}
+
+/* 사이드바 */
+.sb{background:var(--bg2);border-right:1px solid var(--bd);display:flex;flex-direction:column;overflow:hidden}
+.sbh{padding:10px 13px 8px;border-bottom:1px solid var(--bd2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.sblbl{font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--tx2);text-transform:uppercase}
+.sbcnt{font-size:10px;color:var(--tx3);font-family:var(--m)}
+.sbscroll{flex:1;overflow-y:auto;padding:7px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
+.sbscroll::-webkit-scrollbar{width:3px}
+.sbscroll::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+.cat{background:var(--bg3);border:1px solid var(--bd);border-radius:7px;margin-bottom:5px;overflow:hidden}
+.cath{padding:8px 10px;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.cath:hover{background:rgba(255,255,255,.02)}
+.catc{font-size:9px;color:var(--tx3);transition:transform .2s;flex-shrink:0}
+.cat.open .catc{transform:rotate(90deg)}
+.catn{flex:1;font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catnum{font-size:10px;font-family:var(--m);background:var(--bg2);color:var(--tx2);padding:1px 5px;border-radius:7px;border:1px solid var(--bd2)}
+.catdel{background:none;border:none;cursor:pointer;color:var(--tx3);font-size:12px;padding:2px;border-radius:3px;flex-shrink:0;line-height:1;transition:color .15s}
+.catdel:hover{color:var(--red)}
+.phsec{display:none;border-top:1px solid var(--bd2)}
+.cat.open .phsec{display:block}
+.phitem{display:flex;align-items:center;gap:5px;padding:5px 10px;border-bottom:1px solid var(--bd2)}
+.phitem:last-of-type{border-bottom:none}
+.phtag{flex:1;font-size:10px;font-family:var(--m);color:var(--red);background:var(--rbg);padding:2px 5px;border-radius:3px;border:1px solid var(--rbd);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.phdel{background:none;border:none;cursor:pointer;color:var(--tx3);font-size:11px;padding:1px;flex-shrink:0;transition:color .15s}
+.phdel:hover{color:var(--red)}
+.addph{display:flex;gap:5px;padding:6px 8px;border-top:1px solid var(--bd2);background:rgba(0,0,0,.1)}
+.addph input{flex:1;background:var(--bg2);border:1px solid var(--bd);border-radius:5px;padding:4px 7px;font-size:11px;color:var(--tx);outline:none;font-family:var(--m);height:26px}
+.addph input:focus{border-color:#404068}
+.addph input::placeholder{color:var(--tx3)}
+.addph button{background:var(--bg3);border:1px solid var(--bd);border-radius:5px;padding:0 8px;font-size:11px;color:var(--tx2);cursor:pointer;height:26px;white-space:nowrap}
+.addph button:hover{color:var(--tx)}
+.addcat{padding:7px;border-top:1px solid var(--bd2);flex-shrink:0;display:flex;gap:5px}
+.addcat input{flex:1;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:5px 9px;font-size:12px;color:var(--tx);outline:none;height:30px}
+.addcat input:focus{border-color:#404068}
+.addcat input::placeholder{color:var(--tx3)}
+.addcat button{background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:0 10px;font-size:12px;color:var(--tx2);cursor:pointer;height:30px;white-space:nowrap;font-weight:600}
+.addcat button:hover{color:var(--tx)}
+
+/* 카테고리 선택 */
+.catsel-wrap{padding:6px 7px;border-bottom:1px solid var(--bd2);flex-shrink:0}
+.catsel-lbl{font-size:10px;color:var(--tx3);margin-bottom:4px;display:block}
+.catsel{width:100%;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:5px 8px;font-size:12px;color:var(--tx);outline:none;cursor:pointer}
+.catsel:focus{border-color:var(--blu)}
+.catsel option{background:var(--bg3)}
+
+/* 메인 */
+.main{display:flex;flex-direction:column;overflow:hidden}
+
+/* 업로드 영역 */
+.ms{flex:1;overflow-y:auto;padding:14px;scrollbar-width:thin;scrollbar-color:var(--bd) transparent}
+.ms::-webkit-scrollbar{width:4px}
+.ms::-webkit-scrollbar-thumb{background:var(--bd);border-radius:2px}
+
+.upzone{border:2px dashed var(--bd);border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;background:var(--bg2);transition:border-color .2s,background .2s;margin-bottom:12px}
+.upzone:hover,.upzone.drag{border-color:var(--blu);background:rgba(74,126,255,.04)}
+.upico{font-size:28px;margin-bottom:8px;opacity:.45}
+.uptx{font-size:13px;color:var(--tx2);margin-bottom:3px}
+.upsub{font-size:11px;color:var(--tx3)}
+#finp{display:none}
+
+/* 이미지 목록 */
+.imglist{display:none;margin-bottom:12px}
+.imglist-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.imglist-lbl{font-size:11px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.06em}
+.imglist-add{font-size:11px;background:none;border:1px solid var(--bd);border-radius:5px;padding:3px 9px;color:var(--tx2);cursor:pointer}
+.imglist-add:hover{color:var(--tx)}
+.imglist-clear{font-size:11px;background:none;border:1px solid var(--rbd);border-radius:5px;padding:3px 9px;color:var(--red);cursor:pointer;opacity:.7}
+.imglist-clear:hover{opacity:1}
+.imgitems{display:flex;flex-direction:column;gap:5px}
+.imgitem{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:6px 8px;cursor:pointer;transition:border-color .15s}
+.imgitem:hover{border-color:#404068}
+.imgitem.active{border-color:var(--blu)}
+.imgthumb{width:38px;height:38px;object-fit:cover;border-radius:4px;flex-shrink:0;background:var(--bg3)}
+.imgmeta{flex:1;min-width:0}
+.imgfn{font-size:11px;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.imgdim{font-size:10px;color:var(--tx3);font-family:var(--m)}
+.imgdel{background:none;border:none;cursor:pointer;color:var(--tx3);font-size:14px;padding:2px 4px;flex-shrink:0;border-radius:3px;transition:color .15s}
+.imgdel:hover{color:var(--red)}
+.imgvio{font-size:9px;padding:2px 6px;border-radius:10px;flex-shrink:0;font-weight:600}
+.imgvio.vio{background:var(--rbg);color:var(--red);border:1px solid var(--rbd)}
+.imgvio.ok{background:rgba(61,184,122,.08);color:var(--grn);border:1px solid rgba(61,184,122,.22)}
+.imgvio.pending{background:rgba(245,158,11,.08);color:var(--ylw);border:1px solid rgba(245,158,11,.2)}
+
+/* 미리보기 영역 */
+.preview-wrap{display:none;margin-bottom:12px}
+.preview-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.preview-fn{font-size:11px;font-family:var(--m);color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:8px}
+.preview-info{font-size:10px;font-family:var(--m);color:var(--tx3);padding:4px 8px;background:var(--bg3);border:1px solid var(--bd);border-radius:5px;margin-bottom:7px}
+.imgwrap{position:relative;display:inline-block;max-width:100%;border:1px solid var(--bd);border-radius:7px;overflow:hidden}
+#pimg{display:block;max-width:100%;height:auto}
+#vc{position:absolute;top:0;left:0;pointer-events:none}
+
+/* 결과 */
+.sumwrap{border-top:1px solid var(--bd);background:var(--bg2);overflow-y:auto;scrollbar-width:thin;max-height:260px;display:none}
+.sumbody{padding:13px 16px}
+.sumhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
+.sumttl{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tx2)}
+.sumts{font-size:10px;color:var(--tx3);font-family:var(--m)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:11px}
+.stat{background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:8px 10px}
+.statl{font-size:10px;color:var(--tx2);margin-bottom:3px}
+.statv{font-size:20px;font-weight:700;font-family:var(--m);line-height:1}
+.statv.r{color:var(--red)}
+.statv.g{color:var(--grn)}
+.statv.s{font-size:10px;font-weight:400;color:var(--tx2);margin-top:3px;line-height:1.4;word-break:break-all}
+.sumtxt{font-size:11px;color:var(--tx2);line-height:1.5;padding:7px 9px;background:var(--bg3);border-radius:5px;border:1px solid var(--bd);margin-bottom:9px}
+.vlist{display:flex;flex-direction:column;gap:5px}
+.vi{display:flex;gap:9px;background:var(--bg3);border:1px solid var(--bd);border-left:2px solid var(--red);border-radius:6px;padding:9px 11px}
+.vin{width:18px;height:18px;background:var(--rbg);color:var(--red);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;margin-top:1px}
+.vid{flex:1;min-width:0}
+.viph{font-family:var(--m);font-size:11px;font-weight:600;color:var(--red);margin-bottom:2px}
+.viac{font-size:11px;margin-bottom:2px}
+.viac strong{color:#d8d8f2}
+.virsn{font-size:10px;color:var(--tx2);line-height:1.4;margin-bottom:2px}
+.vimeta{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.vicat{font-size:9px;background:rgba(74,126,255,.14);color:#88aaff;padding:1px 5px;border-radius:7px;font-weight:500}
+.viloc{font-size:9px;color:var(--tx3);font-family:var(--m)}
+.cleanbox{display:flex;align-items:center;gap:10px;background:rgba(61,184,122,.07);border:1px solid rgba(61,184,122,.22);border-radius:7px;padding:12px 14px;color:var(--grn);font-size:13px;font-weight:600}
+.errbox{background:var(--rbg);border:1px solid var(--rbd);border-radius:7px;padding:12px 14px;font-size:12px;line-height:1.9;color:#f08080}
+.errbox b{font-size:13px;display:block;margin-bottom:6px;color:#ff9090}
+
+/* 하단 바 */
+.bot{padding:10px 16px;border-top:1px solid var(--bd);display:flex;align-items:center;gap:10px;background:var(--bg2);flex-shrink:0}
+.abtn{background:var(--red);border:none;border-radius:7px;padding:8px 20px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;display:flex;align-items:center;gap:7px;flex-shrink:0;transition:opacity .15s}
+.abtn:hover{opacity:.86}
+.abtn:disabled{opacity:.3;cursor:not-allowed}
+.abtn.all{background:#3a3a60;border:1px solid var(--bd)}
+.abtn.all:hover{background:#454570}
+.stx{font-size:12px;color:var(--tx2);display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+.spin{width:12px;height:12px;border:1.5px solid var(--bd);border-top-color:var(--red);border-radius:50%;animation:sp .7s linear infinite;flex-shrink:0}
+@keyframes sp{to{transform:rotate(360deg)}}
+.prog{font-size:11px;color:var(--tx3);font-family:var(--m)}
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="obox">
+    <div class="oico">
+      <svg viewBox="0 0 30 30" fill="none">
+        <rect x="2" y="2" width="26" height="26" rx="5" stroke="white" stroke-width="2.2"/>
+        <path d="M8 10h14M8 15h10M8 20h6" stroke="white" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <div class="otitle">상세페이지 검수 도구</div>
+    <div class="odesc">상품 상세페이지 금지문구 자동 검수 시스템입니다.<br>Anthropic API 키를 입력하면 바로 시작됩니다.</div>
+    <label class="olbl">Anthropic API Key</label>
+    <div class="oerr" id="oerr"></div>
+    <input class="oinp" id="okey" type="password" placeholder="sk-ant-api03-...">
+    <button class="obtn" id="obtn" onclick="go()">검수 시작하기 →</button>
+    <div class="ohint">
+      API 키 발급: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create Key
+    </div>
+  </div>
+</div>
+
+<div class="hdr">
+  <div class="htx">
+    <div class="hico2">
+      <svg viewBox="0 0 14 14" fill="none">
+        <rect x="1" y="1" width="12" height="12" rx="2" stroke="white" stroke-width="1.2"/>
+        <path d="M3 4h8M3 7h5M3 10h3" stroke="white" stroke-width="1.2" stroke-linecap="round"/>
+        <circle cx="11" cy="11" r="3" fill="#ff4444"/>
+        <path d="M11 9.5v3M9.5 11h3" stroke="white" stroke-width="1" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="htitle">상세페이지 검수 도구</span>
+    <span class="hsub">금지문구 자동 검수</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="hkey" id="hkey">—</span>
+    <button class="hchg" onclick="resetKey()">키 변경</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <aside class="sb">
+    <div class="sbh"><span class="sblbl">금지단어사전</span><span class="sbcnt" id="dcnt">—</span></div>
+    <div class="catsel-wrap">
+      <span class="catsel-lbl">검수 시 적용할 카테고리 선택</span>
+      <select class="catsel" id="activecat" onchange="saveActivecat()">
+        <option value="__all__">전체 카테고리 적용</option>
+      </select>
+    </div>
+    <div class="sbscroll" id="dcon"></div>
+    <div class="addcat">
+      <input id="nci" type="text" placeholder="새 카테고리 (예: 식품)">
+      <button onclick="addCat()">+ 추가</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="ms">
+      <div class="upzone" id="upzone">
+        <div class="upico">🖼️</div>
+        <div class="uptx">상세페이지 이미지를 업로드하세요</div>
+        <div class="upsub">클릭하거나 드래그 &middot; JPG PNG WEBP &middot; 여러 장 가능</div>
+        <input type="file" id="finp" accept="image/*" multiple>
+      </div>
+
+      <div class="imglist" id="imglist">
+        <div class="imglist-hd">
+          <span class="imglist-lbl" id="imglist-lbl">이미지 0장</span>
+          <div style="display:flex;gap:5px">
+            <button class="imglist-add" onclick="document.getElementById('finp').click()">+ 추가</button>
+            <button class="imglist-clear" onclick="clearAll()">전체 삭제</button>
+          </div>
+        </div>
+        <div class="imgitems" id="imgitems"></div>
+      </div>
+
+      <div class="preview-wrap" id="preview-wrap">
+        <div class="preview-hd">
+          <span class="preview-fn" id="preview-fn"></span>
+        </div>
+        <div class="preview-info" id="preview-info"></div>
+        <div class="imgwrap"><img id="pimg" src="" alt=""><canvas id="vc"></canvas></div>
+      </div>
+    </div>
+
+    <div class="sumwrap" id="sumwrap"><div class="sumbody" id="sumbody"></div></div>
+
+    <div class="bot">
+      <button class="abtn" id="ibtn" onclick="runCurrent()">🔍 현재 이미지 검수</button>
+      <button class="abtn all" id="allbtn" onclick="runAll()" style="display:none">📋 전체 검수</button>
+      <div class="stx" id="ist">이미지를 업로드한 뒤 검수를 시작하세요.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DICT_DEFAULT = {
+  '화장품': ['최고','특효','기적','완치','100% 효과보장','부작용없음','식약처 인증','재생','의학적으로 증명','피부 재생','세포 재생'],
+  '건강식품': ['암 예방','당뇨 치료','혈압 정상화','다이어트 보장','치료 효과','100% 천연','면역력 증가 보장'],
+  '의류': ['명품급','100% 정품보증','해외직구 정품','짝퉁'],
+  '전자제품': ['세계최초','국내 최고 성능','타사 대비 2배','최저가 보장'],
+};
+
+const D = {
+  dict: JSON.parse(localStorage.getItem('dict') || 'null') || JSON.parse(JSON.stringify(DICT_DEFAULT)),
+  images: [],      // {id, name, dataUrl, w, h, size, result, status}
+  currentId: null,
+  busy: false,
+};
+
+function saveDict() { localStorage.setItem('dict', JSON.stringify(D.dict)); }
+
+// ─── API 키 ───────────────────────────────────────────────
+async function go() {
+  const key = document.getElementById('okey').value.trim();
+  const err = document.getElementById('oerr');
+  err.style.display = 'none';
+  if (!key) { err.textContent = 'API 키를 입력해 주세요.'; err.style.display = 'block'; return; }
+  if (!key.startsWith('sk-')) { err.textContent = 'sk-ant-api03- 으로 시작하는 키를 입력해 주세요.'; err.style.display = 'block'; return; }
+  const btn = document.getElementById('obtn');
+  btn.disabled = true; btn.textContent = '확인 중...';
+  try {
+    const r = await fetch('/save-key', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key}) });
+    if (!r.ok) throw new Error('서버 오류');
+    document.getElementById('overlay').style.display = 'none';
+    document.getElementById('hkey').textContent = key.slice(0,18) + '···';
+  } catch(e) {
+    err.textContent = '서버 연결 실패 — node server.js 가 실행 중인지 확인하세요.';
+    err.style.display = 'block';
+  }
+  btn.disabled = false; btn.textContent = '검수 시작하기 →';
+}
+function resetKey() { document.getElementById('okey').value=''; document.getElementById('overlay').style.display='flex'; }
+document.getElementById('okey').addEventListener('keydown', e => { if(e.key==='Enter') go(); });
+
+// ─── Anthropic API 호출 ──────────────────────────────────
+async function callAPI(messages, maxTokens=2000) {
+  const res = await fetch('/api', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ model:'claude-opus-4-8', max_tokens: maxTokens, messages })
+  });
+  const d = await res.json();
+  if (!res.ok) throw new Error(d.error || `API 오류 ${res.status}`);
+  return (d.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+}
+
+// ─── JSON 파싱 (마크다운 제거 후) ─────────────────────────
+function parseJSON(raw) {
+  let s = raw.trim();
+  s = s.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1) throw new Error('JSON 응답을 찾을 수 없습니다.');
+  return JSON.parse(s.slice(start, end+1));
+}
+
+// ─── 이미지 압축 (텍스트 읽기 최적화) ────────────────────
+function compressImage(dataUrl, origW, origH) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      // 긴 세로 이미지(상세페이지)는 가로 1200px 유지, 짧은 이미지는 1500px
+      const MAX_W = origH > origW * 2 ? 1200 : 1500;
+      const MAX_H = 8000; // 세로 최대
+      let W = origW, H = origH;
+      if (W > MAX_W) { H = Math.round(H * MAX_W / W); W = MAX_W; }
+      if (H > MAX_H) { W = Math.round(W * MAX_H / H); H = MAX_H; }
+
+      // 너무 작으면 원본 유지
+      W = Math.max(W, 400); H = Math.max(H, 400);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      canvas.getContext('2d').drawImage(img, 0, 0, W, H);
+
+      // 품질 조절 — 파일 크기 5MB 이하로
+      let quality = 0.92;
+      let b64, sz;
+      do {
+        const url = canvas.toDataURL('image/jpeg', quality);
+        b64 = url.split(',')[1];
+        sz = b64.length;
+        quality -= 0.08;
+      } while (sz > 4500000 && quality > 0.3);
+
+      resolve({ b64, w: W, h: H, sz });
+    };
+    img.src = dataUrl;
+  });
+}
+
+// ─── 금지어 사전 텍스트 ───────────────────────────────────
+function dictTxt() {
+  const sel = document.getElementById('activecat').value;
+  let entries;
+  if (sel === '__all__') {
+    entries = Object.entries(D.dict);
+  } else {
+    entries = D.dict[sel] ? [[sel, D.dict[sel]]] : [];
+  }
+  return entries.map(([c,ps]) => `[${c}]: ${ps.join(', ')}`).join('\n');
+}
+
+function eh(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ─── 이미지 관리 ─────────────────────────────────────────
+let imgIdSeq = 0;
+function makeId() { return 'img_' + (++imgIdSeq); }
+
+const upzone = document.getElementById('upzone');
+const finp = document.getElementById('finp');
+
+upzone.addEventListener('click', () => finp.click());
+upzone.addEventListener('dragover', e => { e.preventDefault(); upzone.classList.add('drag'); });
+upzone.addEventListener('dragleave', () => upzone.classList.remove('drag'));
+upzone.addEventListener('drop', e => {
+  e.preventDefault(); upzone.classList.remove('drag');
+  const files = [...e.dataTransfer.files].filter(f => f.type.startsWith('image/'));
+  if (files.length) addFiles(files);
+});
+finp.addEventListener('change', e => {
+  const files = [...e.target.files];
+  if (files.length) addFiles(files);
+  finp.value = '';
+});
+
+function addFiles(files) {
+  for (const file of files) {
+    if (file.size > 30 * 1024 * 1024) { alert(`${file.name}: 30MB 초과`); continue; }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const id = makeId();
+        D.images.push({ id, name: file.name, dataUrl: ev.target.result, w: img.naturalWidth, h: img.naturalHeight, size: file.size, result: null, status: 'pending' });
+        renderImageList();
+        if (!D.currentId) selectImage(id);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+}
+
+function selectImage(id) {
+  D.currentId = id;
+  renderImageList();
+  const img = D.images.find(i => i.id === id);
+  if (!img) return;
+  document.getElementById('preview-wrap').style.display = 'block';
+  document.getElementById('preview-fn').textContent = img.name;
+  document.getElementById('preview-info').textContent = `${img.w}×${img.h}px · ${(img.size/1024).toFixed(0)}KB`;
+  const pimg = document.getElementById('pimg');
+  pimg.src = img.dataUrl;
+  pimg.onload = () => {
+    const cv = document.getElementById('vc');
+    cv.width = pimg.offsetWidth; cv.height = pimg.offsetHeight;
+    cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+    if (img.result) drawVio(img.result.violations || []);
+    showResult(img);
+  };
+}
+
+function deleteImage(id) {
+  D.images = D.images.filter(i => i.id !== id);
+  if (D.currentId === id) {
+    D.currentId = D.images.length ? D.images[0].id : null;
+    if (D.currentId) selectImage(D.currentId);
+    else {
+      document.getElementById('preview-wrap').style.display = 'none';
+      document.getElementById('sumwrap').style.display = 'none';
+    }
+  }
+  renderImageList();
+}
+
+function clearAll() {
+  if (!confirm('이미지를 모두 삭제하시겠습니까?')) return;
+  D.images = []; D.currentId = null;
+  document.getElementById('preview-wrap').style.display = 'none';
+  document.getElementById('sumwrap').style.display = 'none';
+  renderImageList();
+  setSt('이미지를 업로드한 뒤 검수를 시작하세요.', false);
+}
+
+function renderImageList() {
+  const list = D.images;
+  const listEl = document.getElementById('imglist');
+  if (list.length === 0) {
+    listEl.style.display = 'none';
+    upzone.style.display = 'block';
+    document.getElementById('allbtn').style.display = 'none';
+    return;
+  }
+  upzone.style.display = 'none';
+  listEl.style.display = 'block';
+  document.getElementById('imglist-lbl').textContent = `이미지 ${list.length}장`;
+  document.getElementById('allbtn').style.display = list.length > 1 ? 'flex' : 'none';
+
+  const container = document.getElementById('imgitems');
+  container.innerHTML = list.map(img => {
+    let badge = '';
+    if (img.status === 'done') {
+      const cnt = (img.result?.violations||[]).length;
+      badge = cnt > 0
+        ? `<span class="imgvio vio">위반 ${cnt}건</span>`
+        : `<span class="imgvio ok">이상없음</span>`;
+    } else if (img.status === 'checking') {
+      badge = `<span class="imgvio pending">검수중...</span>`;
+    } else {
+      badge = `<span class="imgvio pending">미검수</span>`;
+    }
+    return `<div class="imgitem${img.id===D.currentId?' active':''}" data-id="${img.id}">
+      <img class="imgthumb" src="${img.dataUrl}" alt="">
+      <div class="imgmeta">
+        <div class="imgfn">${eh(img.name)}</div>
+        <div class="imgdim">${img.w}×${img.h}px</div>
+      </div>
+      ${badge}
+      <button class="imgdel" data-del="${img.id}" title="삭제">✕</button>
+    </div>`;
+  }).join('');
+
+  container.querySelectorAll('.imgitem').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('[data-del]')) return;
+      selectImage(el.dataset.id);
+    });
+  });
+  container.querySelectorAll('[data-del]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); deleteImage(btn.dataset.del); });
+  });
+}
+
+// ─── 검수 실행 ────────────────────────────────────────────
+async function runCurrent() {
+  if (!D.currentId) { alert('이미지를 먼저 선택해 주세요.'); return; }
+  if (D.busy) return;
+  await inspectImage(D.images.find(i => i.id === D.currentId));
+}
+
+async function runAll() {
+  if (D.busy) return;
+  if (D.images.length === 0) { alert('이미지를 먼저 업로드해 주세요.'); return; }
+  D.busy = true;
+  setBusy(true);
+  for (let i = 0; i < D.images.length; i++) {
+    const img = D.images[i];
+    setSt(`전체 검수 중... (${i+1}/${D.images.length})`, true);
+    img.status = 'checking'; renderImageList();
+    await inspectImageCore(img);
+    renderImageList();
+  }
+  D.busy = false; setBusy(false);
+  const total = D.images.reduce((s,i) => s+(i.result?.violations?.length||0), 0);
+  setSt(`전체 검수 완료 — 총 ${total}건 위반 발견`, false);
+  if (D.currentId) showResult(D.images.find(i=>i.id===D.currentId));
+}
+
+async function inspectImage(img) {
+  if (!img) return;
+  if (D.busy) return;
+  D.busy = true; setBusy(true);
+  img.status = 'checking'; renderImageList();
+  await inspectImageCore(img);
+  D.busy = false; setBusy(false);
+  renderImageList();
+  if (D.currentId === img.id) {
+    showResult(img);
+    if (img.result) drawVio(img.result.violations||[]);
+    const cnt = (img.result?.violations||[]).length;
+    setSt(cnt > 0 ? `검수 완료 — ${cnt}개 위반 문구 발견` : '검수 완료 — 위반 문구 없음', false);
+  }
+}
+
+async function inspectImageCore(img) {
+  const allPhrases = Object.values(D.dict).flat();
+  if (allPhrases.length === 0) { setSt('금지단어사전에 문구가 없습니다.', false); img.status='pending'; return; }
+
+  try {
+    setSt(`압축 중... (${img.name})`, true);
+    const { b64, w, h, sz } = await compressImage(img.dataUrl, img.w, img.h);
+    setSt(`AI 분석 중... (${w}×${h}px, ${(sz/1024).toFixed(0)}KB)`, true);
+
+    const dictText = dictTxt();
+    const prompt = `당신은 한국 전자상거래 상품 상세페이지(웹기술서) 금지문구 검수 전문가입니다.
+
+이미지에 있는 모든 텍스트를 꼼꼼히 읽고, 아래 금지 문구 사전과 대조하세요.
+완전 일치뿐 아니라 유사 표현, 변형(띄어쓰기 차이, 한자/영문 혼용, 약어 등)도 포함합니다.
+
+금지 문구 사전:
+${dictText}
+
+검수 방법:
+1. 이미지 속 텍스트를 위에서 아래로 꼼꼼히 읽으세요.
+2. 금지 문구 사전과 비교하여 금지 문구와 일치하거나 유사한 표현이 있으면 violations에 기록하세요.
+3. 위반이 없으면 violations를 빈 배열로, clean을 true로 설정하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요. 마크다운, 설명 없이 순수 JSON만:
+{
+  "violations": [
+    {
+      "category": "카테고리명",
+      "forbidden_phrase": "금지단어사전 원본 문구",
+      "actual_text": "이미지에서 발견된 실제 텍스트",
+      "location": {"x": 0~100, "y": 0~100, "width": 0~100, "height": 0~10},
+      "reason": "금지 사유 한 줄"
+    }
+  ],
+  "total_count": 숫자,
+  "clean": true또는false,
+  "summary": "전체 검수 결과 요약 한 문장"
+}`;
+
+    const raw = await callAPI([{
+      role: 'user',
+      content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+        { type: 'text', text: prompt }
+      ]
+    }], 2000);
+
+    const result = parseJSON(raw);
+    img.result = result;
+    img.status = 'done';
+  } catch(e) {
+    img.status = 'pending';
+    img.result = null;
+    if (D.currentId === img.id) showError(e.message);
+    setSt('오류: ' + e.message, false);
+  }
+}
+
+// ─── 결과 표시 ────────────────────────────────────────────
+function drawVio(vs) {
+  const pimg = document.getElementById('pimg');
+  const cv = document.getElementById('vc');
+  const W = pimg.offsetWidth, H = pimg.offsetHeight;
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, W, H);
+  if (!vs || vs.length === 0) return;
+  const COLORS = [
+    {s:'#e03535',f:'rgba(224,53,53,.18)'},{s:'#f59e0b',f:'rgba(245,158,11,.18)'},
+    {s:'#8b5cf6',f:'rgba(139,92,246,.18)'},{s:'#10b981',f:'rgba(16,185,129,.18)'},
+    {s:'#f97316',f:'rgba(249,115,22,.18)'}
+  ];
+  vs.forEach((v, i) => {
+    const l = v.location || {};
+    const x = ((l.x||0)/100)*W, y = ((l.y||0)/100)*H;
+    const w = ((l.width||25)/100)*W, h = Math.max(((l.height||3)/100)*H, 18);
+    const col = COLORS[i % COLORS.length];
+    ctx.fillStyle = col.f; ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = col.s; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+    const pw = 22, ph = 18;
+    const px = Math.max(Math.min(x + w - pw - 2, W - pw - 4), x);
+    const py = Math.max(y - ph - 2, 2);
+    ctx.fillStyle = col.s;
+    ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 4); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(i+1), px + pw/2, py + ph/2);
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+  });
+}
+
+function showResult(img) {
+  const sw = document.getElementById('sumwrap');
+  const sb = document.getElementById('sumbody');
+  if (!img || !img.result) { sw.style.display = 'none'; return; }
+  sw.style.display = 'block';
+
+  const result = img.result;
+  const vs = result.violations || [];
+  const cats = [...new Set(vs.map(v=>v.category))];
+  const now = new Date().toLocaleTimeString('ko-KR');
+  const sl = img.name.length > 28 ? img.name.slice(0,28)+'…' : img.name;
+
+  let html = `<div class="sumhd"><span class="sumttl">검수 결과 리포트</span><span class="sumts">${now}</span></div>
+  <div class="stats">
+    <div class="stat"><div class="statl">위반 문구 수</div><div class="statv ${vs.length>0?'r':'g'}">${vs.length}</div></div>
+    <div class="stat"><div class="statl">해당 카테고리</div><div class="statv">${cats.length}</div></div>
+    <div class="stat"><div class="statl">검수 파일</div><div class="statv s">${eh(sl)}</div></div>
+  </div>`;
+  if (result.summary) html += `<p class="sumtxt">${eh(result.summary)}</p>`;
+  if (vs.length === 0) {
+    html += `<div class="cleanbox">✅ 금지 문구가 발견되지 않았습니다.</div>`;
+  } else {
+    html += `<div class="vlist">`;
+    vs.forEach((v, i) => {
+      const l = v.location || {};
+      html += `<div class="vi">
+        <div class="vin">${i+1}</div>
+        <div class="vid">
+          <div class="viph">🚫 ${eh(v.forbidden_phrase)}</div>
+          <div class="viac">발견: <strong>${eh(v.actual_text)}</strong></div>
+          ${v.reason ? `<div class="virsn">사유: ${eh(v.reason)}</div>` : ''}
+          <div class="vimeta">
+            <span class="vicat">${eh(v.category)}</span>
+            <span class="viloc">x${Math.round(l.x||0)}% y${Math.round(l.y||0)}%</span>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  sb.innerHTML = html;
+  setTimeout(() => sw.scrollIntoView({behavior:'smooth',block:'start'}), 80);
+}
+
+function showError(msg) {
+  const sw = document.getElementById('sumwrap');
+  sw.style.display = 'block';
+  document.getElementById('sumbody').innerHTML = `<div class="errbox"><b>⚠️ 오류 발생</b>
+    ${eh(msg)}<br><br>
+    • 크레딧 확인: <a href="https://console.anthropic.com" target="_blank" style="color:#88aaff">console.anthropic.com</a> → Billing<br>
+    • API 키 오류: 상단 "키 변경" 버튼으로 재입력<br>
+    • server.js 가 실행 중인지 확인하세요</div>`;
+}
+
+function setSt(msg, loading) {
+  document.getElementById('ist').innerHTML = loading
+    ? `<div class="spin"></div><span>${msg}</span>`
+    : `<span>${msg}</span>`;
+}
+function setBusy(on) {
+  document.getElementById('ibtn').disabled = on;
+  document.getElementById('allbtn').disabled = on;
+  document.getElementById('ibtn').textContent = on ? '⏳ 검수 중...' : '🔍 현재 이미지 검수';
+}
+
+// ─── 금지단어사전 ─────────────────────────────────────────
+let CK = [];
+function catByIdx(i){ return CK[i]; }
+
+function renderDict() {
+  CK = Object.keys(D.dict);
+  let t = 0; CK.forEach(c => t += D.dict[c].length);
+  document.getElementById('dcnt').textContent = `${CK.length}카테고리 · ${t}문구`;
+
+  // 카테고리 선택 드롭다운 갱신
+  const sel = document.getElementById('activecat');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="__all__">전체 카테고리 적용</option>' +
+    CK.map(c => `<option value="${eh(c)}">${eh(c)}</option>`).join('');
+  if (CK.includes(prev) || prev === '__all__') sel.value = prev;
+
+  const con = document.getElementById('dcon'); con.innerHTML = '';
+  CK.forEach((cat, ci) => {
+    const phrases = D.dict[cat];
+    const b = document.createElement('div'); b.className = 'cat';
+    b.innerHTML = `<div class="cath">
+      <span class="catc">▶</span>
+      <span class="catn">${eh(cat)}</span>
+      <span class="catnum">${phrases.length}</span>
+      <button class="catdel" data-a="dc" data-ci="${ci}">✕</button>
+    </div>
+    <div class="phsec">
+      <div>${phrases.map((p,pi)=>`<div class="phitem"><span class="phtag" title="${eh(p)}">${eh(p)}</span><button class="phdel" data-a="dp" data-ci="${ci}" data-pi="${pi}">✕</button></div>`).join('')}</div>
+      <div class="addph"><input class="pin" data-ci="${ci}" type="text" placeholder="금지문구 입력"><button data-a="ap" data-ci="${ci}">추가</button></div>
+    </div>`;
+    con.appendChild(b);
+  });
+  bindDict();
+  saveDict();
+}
+
+function bindDict() {
+  const con = document.getElementById('dcon');
+  const nc = con.cloneNode(true); con.parentNode.replaceChild(nc, con);
+  nc.addEventListener('click', e => {
+    const el = e.target.closest('[data-a]');
+    if (!el) {
+      const h = e.target.closest('.cath');
+      if (h && !e.target.closest('button')) h.closest('.cat').classList.toggle('open');
+      return;
+    }
+    const ci = parseInt(el.dataset.ci), cat = catByIdx(ci);
+    if (el.dataset.a === 'dc') {
+      e.stopPropagation();
+      if (confirm(`"${cat}" 카테고리를 삭제하시겠습니까?`)) { delete D.dict[cat]; renderDict(); }
+    } else if (el.dataset.a === 'dp') {
+      D.dict[cat].splice(parseInt(el.dataset.pi), 1); renderDict();
+    } else if (el.dataset.a === 'ap') {
+      const inp = nc.querySelector(`.pin[data-ci="${ci}"]`);
+      const val = inp?.value.trim() || '';
+      if (!val) { inp?.focus(); return; }
+      if (D.dict[cat].includes(val)) { alert('이미 등록된 문구입니다.'); return; }
+      D.dict[cat].push(val); if (inp) inp.value = '';
+      renderDict();
+      setTimeout(() => { document.querySelectorAll('.cat')[ci]?.classList.add('open'); }, 30);
+    }
+  });
+  nc.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.classList.contains('pin')) {
+      const ci = parseInt(e.target.dataset.ci), cat = catByIdx(ci);
+      const val = e.target.value.trim();
+      if (!val) return;
+      if (D.dict[cat].includes(val)) { alert('이미 등록된 문구입니다.'); return; }
+      D.dict[cat].push(val); e.target.value = '';
+      renderDict();
+      setTimeout(() => { document.querySelectorAll('.cat')[ci]?.classList.add('open'); }, 30);
+    }
+  });
+}
+
+function addCat() {
+  const inp = document.getElementById('nci'), name = inp.value.trim();
+  if (!name) { inp.focus(); return; }
+  if (D.dict[name] !== undefined) { alert('이미 존재하는 카테고리입니다.'); return; }
+  D.dict[name] = []; inp.value = ''; renderDict();
+  setTimeout(() => {
+    const bs = document.querySelectorAll('.cat'); bs[bs.length-1]?.classList.add('open');
+  }, 30);
+}
+document.getElementById('nci').addEventListener('keydown', e => { if(e.key==='Enter') addCat(); });
+
+function saveActivecat() {
+  localStorage.setItem('activecat', document.getElementById('activecat').value);
+}
+
+// ─── 초기화 ───────────────────────────────────────────────
+renderDict();
+const savedCat = localStorage.getItem('activecat');
+if (savedCat) document.getElementById('activecat').value = savedCat;
+</script>
+</body>
+</html>

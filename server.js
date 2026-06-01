@@ -70,6 +70,7 @@ const server = http.createServer((req, res) => {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
+        rejectUnauthorized: false, // 사내 프록시 SSL 우회
       };
       const apiReq = https.request(options, apiRes => {
         let data = '';

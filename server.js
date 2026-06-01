@@ -55,7 +55,7 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'API 키가 저장되지 않았습니다.' }));
       return;
     }
-    const apiKey = fs.readFileSync(KEY_FILE, 'utf8').trim();
+    const apiKey = fs.readFileSync(KEY_FILE, 'utf8').replace(/\s/g, '');
     let body = '';
     req.on('data', d => body += d);
     req.on('end', () => {

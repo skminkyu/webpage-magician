@@ -156,15 +156,17 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 </head>
 <body>
 
+<div id="noKeyBanner" style="background:#2a1a1a;border-bottom:1px solid rgba(240,82,82,0.4);padding:10px 20px;font-size:12px;color:#f08080;display:none">
+  ⚠ API 키 미설정 — Railway 대시보드 → Variables → <strong>ANTHROPIC_API_KEY</strong> 를 추가하세요
+</div>
+
 <div class="header">
   <div class="header-title">상세페이지 <span>광고 검수</span> 시스템</div>
   <div class="header-spacer"></div>
   <div class="key-status">
     <div class="key-dot" id="keyDot"></div>
-    <span id="keyLabel">API 키 없음</span>
-    <div class="key-mask hidden" id="keyMask"></div>
+    <span id="keyLabel">API 키 확인 중...</span>
   </div>
-  <button class="btn-small" id="keyBtn">키 설정</button>
 </div>
 
 <div class="main">
@@ -232,18 +234,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
   <div class="status-text" id="statusText">카테고리를 선택하고 이미지를 업로드하세요</div>
   <div class="progress-bar-wrap">
     <div class="progress-bar" id="progressBar"></div>
-  </div>
-</div>
-
-<div class="modal-bg hidden" id="keyModal">
-  <div class="modal-box">
-    <div class="modal-title">Anthropic API 키 설정</div>
-    <div class="modal-sub">키는 서버에 평문 저장됩니다. 사내 사용 목적으로만 사용하세요.</div>
-    <input class="modal-input" type="password" id="keyInput" placeholder="sk-ant-..." autocomplete="off">
-    <div class="modal-actions">
-      <button class="btn-small" id="keyCancel">취소</button>
-      <button class="btn-primary" id="keySave" style="font-size:12px; padding:7px 16px;">저장</button>
-    </div>
   </div>
 </div>
 

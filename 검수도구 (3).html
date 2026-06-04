@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>상세페이지 광고 검수 시스템</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0f1117;
+  --bg2: #1a1d27;
+  --bg3: #242736;
+  --border: #2e3349;
+  --accent: #5b8af5;
+  --accent2: #7c9ef7;
+  --red: #f05252;
+  --red-bg: #2a1a1a;
+  --green: #34d399;
+  --green-bg: #0d2a1e;
+  --yellow: #fbbf24;
+  --text: #e2e6f0;
+  --text2: #9aa3b8;
+  --text3: #5f6680;
+}
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -apple-system, sans-serif; font-size: 14px; line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+
+.header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0 20px; height: 52px; display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.header-title { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.3px; }
+.header-title span { color: var(--accent); }
+.header-spacer { flex: 1; }
+.key-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); }
+.key-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
+.key-dot.ok { background: var(--green); }
+.key-mask { font-family: monospace; background: var(--bg3); padding: 2px 8px; border-radius: 4px; color: var(--text2); font-size: 11px; }
+.btn-small { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 4px 10px; border-radius: 5px; cursor: pointer; font-size: 11px; transition: all .15s; }
+.btn-small:hover { border-color: var(--accent); color: var(--accent); }
+
+.main { flex: 1; display: grid; grid-template-columns: 280px 1fr; gap: 0; overflow: hidden; height: calc(100vh - 52px - 52px); }
+
+.left { background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.left-section { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.left-section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+
+.cat-btn { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 7px; border: 1px solid var(--border); background: var(--bg3); color: var(--text2); cursor: pointer; margin-bottom: 6px; transition: all .15s; text-align: left; font-size: 13px; }
+.cat-btn:last-child { margin-bottom: 0; }
+.cat-btn .cat-icon { font-size: 18px; width: 26px; text-align: center; }
+.cat-btn .cat-info { flex: 1; }
+.cat-btn .cat-name { font-weight: 600; color: var(--text); font-size: 13px; }
+.cat-btn .cat-law { font-size: 10px; color: var(--text3); margin-top: 1px; }
+.cat-btn.active { border-color: var(--accent); background: rgba(91,138,245,0.1); }
+.cat-btn.active .cat-name { color: var(--accent); }
+
+.rules-box { background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; font-size: 11px; color: var(--text2); line-height: 1.7; max-height: 140px; overflow-y: auto; white-space: pre-wrap; }
+.rules-box::-webkit-scrollbar { width: 4px; } .rules-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.file-list { flex: 1; overflow-y: auto; padding: 8px; }
+.file-list::-webkit-scrollbar { width: 4px; } .file-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.file-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; margin-bottom: 4px; transition: all .15s; }
+.file-item:hover { background: var(--bg3); border-color: var(--border); }
+.file-item.active { background: rgba(91,138,245,0.08); border-color: var(--accent); }
+.file-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-status { font-size: 10px; margin-top: 2px; }
+.status-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; }
+.status-pending { background: var(--bg3); color: var(--text3); }
+.status-running { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.status-violation { background: rgba(240,82,82,0.15); color: var(--red); }
+.status-clean { background: rgba(52,211,153,0.15); color: var(--green); }
+.status-error { background: rgba(240,82,82,0.08); color: var(--red); border: 1px solid rgba(240,82,82,0.3); }
+.file-remove { background: none; border: none; color: var(--text3); cursor: pointer; padding: 2px; font-size: 14px; opacity: 0; transition: opacity .15s; }
+.file-item:hover .file-remove { opacity: 1; }
+
+.right { display: flex; flex-direction: column; overflow: hidden; }
+
+.upload-area { padding: 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.drop-zone { border: 2px dashed var(--border); border-radius: 10px; padding: 24px 16px; text-align: center; cursor: pointer; transition: all .2s; background: var(--bg2); position: relative; }
+.drop-zone.drag-over { border-color: var(--accent); background: rgba(91,138,245,0.06); }
+.drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.drop-icon { font-size: 28px; margin-bottom: 6px; }
+.drop-text { color: var(--text2); font-size: 13px; }
+.drop-text strong { color: var(--accent); }
+.drop-sub { color: var(--text3); font-size: 11px; margin-top: 4px; }
+
+.content-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.content-area::-webkit-scrollbar { width: 5px; } .content-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.preview-container { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.preview-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+.preview-header-title { font-size: 12px; font-weight: 600; color: var(--text2); flex: 1; }
+.preview-body { padding: 12px; max-height: 340px; overflow-y: auto; display: flex; justify-content: center; }
+.preview-body img { max-width: 100%; max-height: 300px; border-radius: 6px; object-fit: contain; }
+
+.results-container { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.results-header { padding: 10px 14px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.results-header-title { font-size: 13px; font-weight: 700; }
+.stat-pill { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.stat-violation { background: rgba(240,82,82,0.15); color: var(--red); }
+.stat-clean { background: rgba(52,211,153,0.15); color: var(--green); }
+.results-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.violation-card { border-left: 3px solid var(--red); background: var(--red-bg); border-radius: 0 8px 8px 0; padding: 10px 12px; }
+.v-phrase { display: inline-block; background: var(--red); color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.v-detected { font-size: 12px; color: var(--text); background: rgba(255,255,255,0.04); padding: 6px 8px; border-radius: 5px; margin-bottom: 6px; font-family: monospace; line-height: 1.5; }
+.v-meta { display: flex; gap: 12px; flex-wrap: wrap; }
+.v-meta-item { font-size: 11px; color: var(--text2); }
+.v-meta-item strong { color: var(--text3); font-weight: 500; }
+.v-reason { font-size: 12px; color: var(--text2); margin-top: 6px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
+
+.clean-box { background: var(--green-bg); border: 1px solid rgba(52,211,153,0.3); border-radius: 8px; padding: 16px; text-align: center; }
+.clean-icon { font-size: 28px; margin-bottom: 6px; }
+.clean-text { color: var(--green); font-weight: 700; font-size: 15px; }
+.clean-sub { color: var(--text2); font-size: 12px; margin-top: 4px; }
+
+.ocr-details { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.ocr-summary { padding: 8px 12px; cursor: pointer; background: var(--bg3); display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text2); user-select: none; }
+.ocr-summary:hover { color: var(--text); }
+.ocr-arrow { transition: transform .2s; display: inline-block; }
+.ocr-details.open .ocr-arrow { transform: rotate(90deg); }
+.ocr-text-content { display: none; padding: 10px 12px; font-size: 11px; color: var(--text2); font-family: monospace; line-height: 1.7; white-space: pre-wrap; background: var(--bg); max-height: 200px; overflow-y: auto; }
+.ocr-details.open .ocr-text-content { display: block; }
+
+.error-box { background: var(--red-bg); border: 1px solid rgba(240,82,82,0.3); border-radius: 8px; padding: 12px 14px; }
+.error-title { color: var(--red); font-weight: 700; font-size: 13px; margin-bottom: 6px; }
+.error-msg { color: var(--text2); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 48px 24px; color: var(--text3); text-align: center; }
+.empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
+.empty-text { font-size: 14px; }
+.empty-sub { font-size: 12px; margin-top: 6px; }
+
+.bottom-bar { background: var(--bg2); border-top: 1px solid var(--border); padding: 0 20px; height: 52px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.btn-primary { background: var(--accent); color: white; border: none; padding: 9px 20px; border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 6px; }
+.btn-primary:hover:not(:disabled) { background: var(--accent2); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-secondary { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 8px 16px; border-radius: 7px; font-size: 12px; cursor: pointer; transition: all .15s; }
+.btn-secondary:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+.status-text { flex: 1; font-size: 12px; color: var(--text2); }
+.progress-bar-wrap { height: 2px; background: var(--border); border-radius: 1px; overflow: hidden; width: 160px; flex-shrink: 0; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 1px; transition: width .3s; width: 0%; }
+
+.modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 100; }
+.modal-box { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 400px; max-width: 90vw; }
+.modal-title { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 16px; }
+.modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: monospace; outline: none; }
+.modal-input:focus { border-color: var(--accent); }
+.modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+.hidden { display: none !important; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">상세페이지 <span>광고 검수</span> 시스템</div>
+  <div class="header-spacer"></div>
+  <div class="key-status">
+    <div class="key-dot" id="keyDot"></div>
+    <span id="keyLabel">API 키 없음</span>
+    <div class="key-mask hidden" id="keyMask"></div>
+  </div>
+  <button class="btn-small" id="keyBtn">키 설정</button>
+</div>
+
+<div class="main">
+  <div class="left">
+    <div class="left-section">
+      <div class="left-section-title">카테고리</div>
+      <button class="cat-btn" data-cat="cosmetics" onclick="selectCategory('cosmetics')">
+        <span class="cat-icon">💄</span>
+        <div class="cat-info">
+          <div class="cat-name">화장품</div>
+          <div class="cat-law">화장품 표시·광고 관리 지침 (식약처)</div>
+        </div>
+      </button>
+      <button class="cat-btn" data-cat="food" onclick="selectCategory('food')">
+        <span class="cat-icon">🥗</span>
+        <div class="cat-info">
+          <div class="cat-name">일반식품</div>
+          <div class="cat-law">식품등의 표시·광고에 관한 법률</div>
+        </div>
+      </button>
+      <button class="cat-btn" data-cat="hfc" onclick="selectCategory('hfc')">
+        <span class="cat-icon">💊</span>
+        <div class="cat-info">
+          <div class="cat-name">건강기능식품</div>
+          <div class="cat-law">건강기능식품에 관한 법률</div>
+        </div>
+      </button>
+    </div>
+    <div class="left-section">
+      <div class="left-section-title">적용 법규 요약</div>
+      <div class="rules-box" id="rulesSummary">카테고리를 선택하면 적용 법규 요약이 표시됩니다.</div>
+    </div>
+    <div class="left-section" style="border-bottom:none; padding-bottom:6px;">
+      <div class="left-section-title">업로드된 이미지 (<span id="fileCount">0</span>)</div>
+    </div>
+    <div class="file-list" id="fileList">
+      <div style="padding:12px; color:var(--text3); font-size:12px; text-align:center;">이미지를 업로드하면<br>여기에 표시됩니다</div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="upload-area">
+      <div class="drop-zone" id="dropZone">
+        <input type="file" accept="image/*" multiple id="fileInput">
+        <div class="drop-icon">📁</div>
+        <div class="drop-text"><strong>클릭</strong>하거나 이미지를 드래그하여 업로드</div>
+        <div class="drop-sub">JPG, PNG, WebP, GIF 등 · 여러 파일 동시 업로드 가능</div>
+      </div>
+    </div>
+    <div class="content-area" id="contentArea">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-text">상세페이지 이미지를 업로드하세요</div>
+        <div class="empty-sub">카테고리 선택 후 이미지를 업로드하고 검수를 시작하세요</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottom-bar">
+  <button class="btn-primary" id="btnStart" disabled>
+    <span>🔍</span> 검수 시작
+  </button>
+  <button class="btn-secondary" id="btnAll" disabled>전체 검수</button>
+  <div class="status-text" id="statusText">카테고리를 선택하고 이미지를 업로드하세요</div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+</div>
+
+<div class="modal-bg hidden" id="keyModal">
+  <div class="modal-box">
+    <div class="modal-title">Anthropic API 키 설정</div>
+    <div class="modal-sub">키는 서버에 평문 저장됩니다. 사내 사용 목적으로만 사용하세요.</div>
+    <input class="modal-input" type="password" id="keyInput" placeholder="sk-ant-..." autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn-small" id="keyCancel">취소</button>
+      <button class="btn-primary" id="keySave" style="font-size:12px; padding:7px 16px;">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── RULES ───────────────────────────────────────────────────────────────────
+
+var COSMETICS_RULES = "[화장품 표시\xB7광고 관리 지침 - 금지표현 (식약처, 2025.8.14)]\n화장품법 제13조에 따라 아래 표현들은 화장품 표시\xB7광고에서 금지됩니다.\n\n1. 질병 진단\xB7치료\xB7경감\xB7처치\xB7예방 및 의학적 효능효과 [제1항 제1호]\n아토피, 모낭충, 심신피로 회복, 건선, 소양증, 살균 소독, 항염, 진통, 해독, 이뇨, 항암, 항진균, 항바이러스, 근육 이완, 통증 경감, 면역 강화, 항알레르기, 찰과상 치료/회복, 화상 치료/회복, 기저귀 발진, 여드름, 기미/주근깨 (실증 없이), 항균\n\n2. 피부 관련 금지표현\n임신선, 튼살, 피부 독소 제거, 디톡스, detox, 상처 반흔 제거/완화, 가려움 완화/개선/해결, OO의 흔적을 없애줌, 홍조/홍반 개선/제거, 뾰루지 개선, 피부 손상 치료/회복/복구, 피부노화 (실증 없이), 셀룰라이트, 붓기 (실증 없이), 다크서클 (실증 없이), 피부구성 물질(효소/콜라겐 등) 증가/감소/활성화\n\n3. 모발 관련 금지표현\n발모, 육모, 양모, 탈모방지, 탈모치료, 모발 성장 촉진/억제, 모발 두께 증가, 속눈썹 자란다, 눈썹 자란다\n\n4. 생리활성 관련 금지표현\n혈액순환, 피부재생, 세포 재생, 세포재생, 피부 세포 재생, 호르몬 분비촉진, 내분비 작용, 유익균 균형 보호, 질 내 산도 유지, 질염 예방, 땀 발생 억제, 세포 성장 촉진, 세포 활력, 세포 활력 증가, 유전자(DNA) 활성화, 세포 활성화\n\n5. 신체 개선 표현\n다이어트, 체중감량, 피하지방 분해, 체형변화, 몸매 개선, 신체 일부를 날씬하게, 가슴 탄력/확대, 얼굴 크기 작아짐, 얼굴 윤곽개선, V라인\n\n6. 기능성 관련 금지표현 [제1항 제2호]\n기능성화장품 심사(보고)하지 않은 제품에: 미백, 화이트닝(whitening), 주름 개선, 링클(wrinkle) 개선, 자외선(UV) 차단\n\n7. 특정인\xB7기관 지정\xB7공인 관련 [제1항 제4호]\nOO 아토피 협회 인증, OO 의료기관의 첨단기술, OO 대학교 출신 의사 공동개발, OO 의사 개발, OO 병원 추천, 병원용, 병원전용, 피부과전용, 피부과시술용, 약국용, 약국전용\n\n8. 의약품 오인 표현\n메디슨(medicine), 드럭(drug), 코스메슈티컬, 치유, 부작용 없음, 먹을 수 있음, 명현현상, 지방볼륨생성, 보톡스, 레이저 시술, 카복시 시술, 체내 노폐물 제거, 필러(filler)\n\n9. 인체 유래 성분 관련\n줄기세포 화장품, stem cell, 엑소좀 화장품 (인체 유래), 인체 줄기세포 함유\n\n10. 피부 나이 감소 표현\n피부나이 n세 감소, 피부나이 n살 어려짐, 피부나이 -n살 등\n\n11. 기타 금지표현\n바늘, 니들, 마이크로니들, 미세침, MTS(Microneedle Therapy System), 외음부세정제의 이너케어, 질 내 주입/사용, 식약처 허가/인증 (기능성화장품 심사(보고) 제외)";
+
+var FOOD_RULES = "[식품등의 표시\xB7광고에 관한 법률 및 식품등의 부당한 표시 또는 광고의 내용 기준]\n\n1. 질병의 예방\xB7치료 효과 표방 [법 제8조 제1항 제1호]\n암 예방, 암 치료, 당뇨 치료, 당뇨 예방, 혈당 낮춤, 혈압 낮춤, 고혈압 치료, 고혈압 예방, 혈압 정상화, 성인병 예방, 관절염 치료, 간 기능 개선, 신장 기능 회복, 심장병 예방, 뇌졸중 예방, 항암, 치매 예방, 골다공증 치료, 통풍 치료, 아토피 치료, 비만 치료\n\n2. 의약품으로 오인\xB7혼동할 수 있는 표현 [법 제8조 제1항 제2호]\n치료제, 처방, 약효, 의약품 원료 함유, 이 제품은 의약품과 같은 효과, 처방받은 것과 동일한 효과, 약사 처방, 약 대신 사용, 처방전 없이\n\n3. 건강기능식품 오인 표현 (일반식품에서 금지)\n면역력 강화, 면역력 증진, 기능성, 기능성 성분 함유, 건강기능, 항산화 효과 (근거 없이), 인체 유용 기능성\n\n4. 허위\xB7과장 표현 [법 제8조 제1항 제3호]\n100% 효과 보장, 완전히 치료, 부작용 없음, 완벽한 효과, 확실한 효과, 기적의 효과, 특효, 완치, 100% 천연\n\n5. 특정인\xB7기관 추천 표현\n의사 추천, 의사 인증, OO 병원 검증, OO 교수 추천, OO 의학회 인증, 약사 추천, 한의사 추천, 의사가 선택한\n\n6. 체중\xB7다이어트 허위 표현\n먹기만 해도 살 빠짐, 1주일에 n kg 감량 보장, 지방 분해 효과, 체지방 연소, 지방 녹임, 살 녹음";
+
+var HFC_RULES = "[건강기능식품에 관한 법률 및 건강기능식품의 표시기준]\n\n1. 인정받지 않은 기능성 표현\n식약처가 기능성을 인정하지 않은 효능 표현. 개별인정형/고시형 기능성 범위 초과 표현\n\n2. 질병 예방\xB7치료 표방 [법 제18조 제1항 제1호]\n당뇨 치료, 고혈압 치료, 암 예방, 암 치료, 관절염 치료, 동맥경화 예방, 뇌경색 예방, 치매 예방/치료\n\n3. 의약품 동등\xB7대체 표현\n이 제품은 약과 같은 효과, 약 대신, 처방 불필요, 병원 갈 필요 없음, 의약품과 동일 성분\n\n4. 과장된 기능성 표현\n완벽한 면역력, 100% 항산화, 완전한 피로 회복, 확실한 체중 감량, 무조건 효과 있음, 기적의 건강기능식품\n\n5. 허가\xB7인증 오인 표현\n세계 최고 건강기능식품, 노벨상 성분 함유, OO 학회 공식 인증, 모든 성인병에 효과\n\n6. 특정인 추천\xB7보증\n의사가 추천하는, OO 대학병원 연구진 개발, 노벨상 수상자 추천";
+
+var RULES_MAP = {
+  cosmetics: { rules: COSMETICS_RULES, name: '화장품', label: '화장품법 제13조 / 화장품 표시·광고 관리 지침 (식약처 2025.8.14)' },
+  food:      { rules: FOOD_RULES,      name: '일반식품', label: '식품등의 표시·광고에 관한 법률 (법 제8조 등)' },
+  hfc:       { rules: HFC_RULES,       name: '건강기능식품', label: '건강기능식품에 관한 법률 (법 제18조 등)' }
+};
+
+var RULES_SUMMARY = {
+  cosmetics: "적용: 화장품법 제13조 / 식약처 고시\n\n주요 금지 영역:\n• 의학적 효능효과 (아토피, 항염, 항균 등)\n• 피부·모발 생리활성 표현 (피부재생, 발모 등)\n• 기능성화장품 미심사 기능 표방 (미백, 주름개선 등)\n• 의약품 오인 표현 (보톡스, 필러 등)\n• 신체 개선 표현 (다이어트, V라인 등)\n• 인체 유래 성분 (줄기세포, 엑소좀 등)",
+  food: "적용: 식품등의 표시·광고에 관한 법률\n\n주요 금지 영역:\n• 질병 예방·치료 효과 표방 (암, 당뇨, 혈압 등)\n• 의약품 오인·혼동 표현\n• 건강기능식품으로 오인될 수 있는 표현\n• 허위·과장 표현 (100% 보장, 특효 등)\n• 특정인·기관 추천 표현\n• 허위 다이어트·체중 표현",
+  hfc: "적용: 건강기능식품에 관한 법률\n\n주요 금지 영역:\n• 인정받지 않은 기능성 표현\n• 질병 예방·치료 표방 (암, 당뇨, 치매 등)\n• 의약품 동등·대체 표현\n• 과장된 기능성 표현 (100%, 완벽 등)\n• 허가·인증 오인 표현\n• 특정인 추천·보증"
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+
+var currentCategory = localStorage.getItem('selectedCategory') || null;
+var files = [];
+var activeFileId = null;
+var isRunning = false;
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', function() {
+  checkKey();
+  if (currentCategory) selectCategory(currentCategory);
+
+  var dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', function() { dz.classList.remove('drag-over'); });
+  dz.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  document.getElementById('fileInput').addEventListener('change', function() {
+    handleFiles(this.files);
+    this.value = '';
+  });
+
+  document.getElementById('keyBtn').addEventListener('click', openKeyModal);
+  document.getElementById('keyCancel').addEventListener('click', closeKeyModal);
+  document.getElementById('keySave').addEventListener('click', saveKey);
+  document.getElementById('btnStart').addEventListener('click', startInspection);
+  document.getElementById('btnAll').addEventListener('click', inspectAll);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !document.getElementById('keyModal').classList.contains('hidden')) saveKey();
+    if (e.key === 'Escape') closeKeyModal();
+  });
+});
+
+// ─── KEY MANAGEMENT ───────────────────────────────────────────────────────────
+
+async function checkKey() {
+  try {
+    var r = await fetch('/check-key');
+    var d = await r.json();
+    var dot = document.getElementById('keyDot');
+    var label = document.getElementById('keyLabel');
+    var mask = document.getElementById('keyMask');
+    if (d.exists) {
+      dot.classList.add('ok');
+      label.textContent = 'API 키 설정됨';
+      mask.classList.remove('hidden');
+      mask.textContent = 'sk-ant-••••••';
+    } else {
+      dot.classList.remove('ok');
+      label.textContent = 'API 키 없음';
+      mask.classList.add('hidden');
+    }
+  } catch(e) {}
+  updateButtons();
+}
+
+function openKeyModal() {
+  document.getElementById('keyModal').classList.remove('hidden');
+  document.getElementById('keyInput').value = '';
+  setTimeout(function() { document.getElementById('keyInput').focus(); }, 50);
+}
+
+function closeKeyModal() {
+  document.getElementById('keyModal').classList.add('hidden');
+}
+
+async function saveKey() {
+  var key = document.getElementById('keyInput').value.trim();
+  if (!key.startsWith('sk-')) { alert('유효한 Anthropic API 키를 입력하세요 (sk- 로 시작)'); return; }
+  try {
+    var r = await fetch('/save-key', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key })
+    });
+    var d = await r.json();
+    if (d.ok) { closeKeyModal(); checkKey(); }
+    else alert('저장 실패: ' + (d.error || '알 수 없는 오류'));
+  } catch(e) { alert('저장 실패: ' + e.message); }
+}
+
+// ─── CATEGORY ─────────────────────────────────────────────────────────────────
+
+function selectCategory(cat) {
+  currentCategory = cat;
+  localStorage.setItem('selectedCategory', cat);
+  document.querySelectorAll('.cat-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.cat === cat);
+  });
+  document.getElementById('rulesSummary').textContent = RULES_SUMMARY[cat] || '';
+  updateButtons();
+  renderContent();
+}
+
+// ─── FILE HANDLING ────────────────────────────────────────────────────────────
+
+function handleFiles(fileList) {
+  Array.from(fileList).forEach(function(file) {
+    if (!file.type.startsWith('image/')) return;
+    var id = Date.now() + Math.random();
+    var objectUrl = URL.createObjectURL(file);
+    files.push({ id: id, name: file.name, file: file, objectUrl: objectUrl, status: 'pending', result: null, ocrText: null, error: null });
+    if (!activeFileId) activeFileId = id;
+  });
+  renderFileList();
+  renderContent();
+  updateButtons();
+}
+
+function removeFile(id) {
+  var f = files.find(function(x) { return x.id === id; });
+  if (f) URL.revokeObjectURL(f.objectUrl);
+  files = files.filter(function(x) { return x.id !== id; });
+  if (activeFileId === id) activeFileId = files.length ? files[0].id : null;
+  renderFileList();
+  renderContent();
+  updateButtons();
+}
+
+function selectFile(id) {
+  activeFileId = id;
+  renderFileList();
+  renderContent();
+}
+
+function renderFileList() {
+  var list = document.getElementById('fileList');
+  document.getElementById('fileCount').textContent = files.length;
+  if (!files.length) {
+    list.innerHTML = '<div style="padding:12px; color:var(--text3); font-size:12px; text-align:center;">이미지를 업로드하면<br>여기에 표시됩니다</div>';
+    return;
+  }
+  list.innerHTML = files.map(function(f) {
+    return '<div class="file-item' + (f.id === activeFileId ? ' active' : '') + '" data-id="' + f.id + '">' +
+      '<img class="file-thumb" src="' + f.objectUrl + '" alt="">' +
+      '<div class="file-info">' +
+        '<div class="file-name">' + escHtml(f.name) + '</div>' +
+        '<div class="file-status">' + statusBadge(f) + '</div>' +
+      '</div>' +
+      '<button class="file-remove" data-remove="' + f.id + '" title="제거">✕</button>' +
+    '</div>';
+  }).join('');
+
+  list.querySelectorAll('.file-item').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+      if (e.target.dataset.remove) return;
+      selectFile(parseFloat(el.dataset.id));
+    });
+  });
+  list.querySelectorAll('.file-remove').forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      removeFile(parseFloat(btn.dataset.remove));
+    });
+  });
+}
+
+function statusBadge(f) {
+  if (f.status === 'pending') return '<span class="status-badge status-pending">미검수</span>';
+  if (f.status === 'running') return '<span class="status-badge status-running">검수중...</span>';
+  if (f.status === 'done') {
+    if (f.error) return '<span class="status-badge status-error">오류</span>';
+    var n = (f.result && f.result.violations) ? f.result.violations.length : 0;
+    return n > 0
+      ? '<span class="status-badge status-violation">위반 ' + n + '건</span>'
+      : '<span class="status-badge status-clean">이상없음</span>';
+  }
+  return '';
+}
+
+// ─── RENDER CONTENT ───────────────────────────────────────────────────────────
+
+function clearDynamic() {
+  ['dynPreview','dynResults','dynOcr','dynError'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.remove();
+  });
+}
+
+function renderContent() {
+  var area = document.getElementById('contentArea');
+  var empty = document.getElementById('emptyState');
+  clearDynamic();
+
+  if (!files.length || !activeFileId) {
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  var f = files.find(function(x) { return x.id === activeFileId; });
+  if (!f) return;
+
+  // Preview
+  var vcount = f.result ? (f.result.violations ? f.result.violations.length : 0) : -1;
+  var preview = document.createElement('div');
+  preview.className = 'preview-container';
+  preview.id = 'dynPreview';
+  preview.innerHTML =
+    '<div class="preview-header">' +
+      '<div class="preview-header-title">미리보기: ' + escHtml(f.name) + '</div>' +
+      (f.result ? '<span class="stat-pill ' + (vcount > 0 ? 'stat-violation' : 'stat-clean') + '">' + (vcount > 0 ? '위반 ' + vcount + '건' : '이상없음') + '</span>' : '') +
+    '</div>' +
+    '<div class="preview-body"><img src="' + f.objectUrl + '" alt="미리보기"></div>';
+  area.appendChild(preview);
+
+  // Results
+  if (f.status === 'done' && !f.error && f.result) {
+    var rc = document.createElement('div');
+    rc.className = 'results-container';
+    rc.id = 'dynResults';
+    var catName = RULES_MAP[currentCategory] ? RULES_MAP[currentCategory].name : '';
+    rc.innerHTML =
+      '<div class="results-header">' +
+        '<div class="results-header-title">검수 결과</div>' +
+        '<span class="stat-pill ' + (vcount > 0 ? 'stat-violation' : 'stat-clean') + '">' + (vcount > 0 ? '위반 ' + vcount + '건' : '이상없음') + '</span>' +
+        '<span style="font-size:11px;color:var(--text3)">' + escHtml(catName) + ' \xB7 ' + escHtml(f.name) + '</span>' +
+      '</div>' +
+      '<div class="results-body" id="dynResultsBody"></div>';
+    if (f.result.summary) {
+      rc.innerHTML += '<div style="padding:8px 14px 10px; font-size:11px; color:var(--text3); border-top:1px solid var(--border);">요약: ' + escHtml(f.result.summary) + (f.result.ocr_length ? ' (OCR ' + f.result.ocr_length + '자)' : '') + '</div>';
+    }
+    area.appendChild(rc);
+
+    var body = document.getElementById('dynResultsBody');
+    if (vcount > 0) {
+      f.result.violations.forEach(function(v) {
+        var card = document.createElement('div');
+        card.className = 'violation-card';
+        card.innerHTML =
+          '<div class="v-phrase">' + escHtml(v.forbidden_phrase || '') + '</div>' +
+          '<div class="v-detected">&ldquo;' + escHtml(v.detected_text || '') + '&rdquo;</div>' +
+          '<div class="v-meta">' +
+            '<div class="v-meta-item"><strong>카테고리:</strong> ' + escHtml(v.category || '') + '</div>' +
+            '<div class="v-meta-item"><strong>법조항:</strong> ' + escHtml(v.law_reference || '') + '</div>' +
+          '</div>' +
+          (v.reason ? '<div class="v-reason">' + escHtml(v.reason) + '</div>' : '');
+        body.appendChild(card);
+      });
+    } else {
+      body.innerHTML =
+        '<div class="clean-box">' +
+          '<div class="clean-icon">✅</div>' +
+          '<div class="clean-text">위반 표현이 발견되지 않았습니다</div>' +
+          '<div class="clean-sub">' + escHtml((f.result && f.result.summary) || '') + '</div>' +
+        '</div>';
+    }
+  }
+
+  // Error
+  if (f.status === 'done' && f.error) {
+    var errEl = document.createElement('div');
+    errEl.className = 'error-box';
+    errEl.id = 'dynError';
+    errEl.innerHTML = '<div class="error-title">⚠ 검수 오류</div><div class="error-msg">' + escHtml(f.error) + '</div>';
+    area.appendChild(errEl);
+  }
+
+  // OCR viewer
+  if (f.ocrText) {
+    var ocrEl = document.createElement('div');
+    ocrEl.className = 'ocr-details';
+    ocrEl.id = 'dynOcr';
+    ocrEl.innerHTML =
+      '<div class="ocr-summary">' +
+        '<span class="ocr-arrow">▶</span>' +
+        '<span>OCR 추출 텍스트 (' + f.ocrText.length + '자)</span>' +
+      '</div>' +
+      '<div class="ocr-text-content">' + escHtml(f.ocrText) + '</div>';
+    ocrEl.querySelector('.ocr-summary').addEventListener('click', function() {
+      ocrEl.classList.toggle('open');
+    });
+    area.appendChild(ocrEl);
+  }
+}
+
+// ─── INSPECTION ───────────────────────────────────────────────────────────────
+
+async function startInspection() {
+  if (!activeFileId || isRunning) return;
+  var f = files.find(function(x) { return x.id === activeFileId; });
+  if (!f) return;
+  isRunning = true;
+  updateButtons();
+  await inspectFile(f);
+  isRunning = false;
+  updateButtons();
+}
+
+async function inspectAll() {
+  if (isRunning) return;
+  var pending = files.slice();
+  if (!pending.length) return;
+  isRunning = true;
+  updateButtons();
+  for (var i = 0; i < pending.length; i++) {
+    var f = pending[i];
+    activeFileId = f.id;
+    renderFileList();
+    renderContent();
+    setStatus('검수 중 ' + (i+1) + '/' + pending.length + ': ' + f.name);
+    setProgress((i / pending.length) * 100);
+    await inspectFile(f);
+  }
+  isRunning = false;
+  setProgress(100);
+  setStatus('전체 검수 완료 (' + pending.length + '개)');
+  updateButtons();
+  renderFileList();
+  renderContent();
+}
+
+async function inspectFile(f) {
+  f.status = 'running';
+  f.error = null;
+  f.result = null;
+  f.ocrText = null;
+  renderFileList();
+  if (f.id === activeFileId) renderContent();
+  setStatus('OCR 추출 중: ' + f.name);
+
+  try {
+    var compressed = await compressImage(f.file, 1200, 0.82);
+    var b64 = compressed.split(',')[1];
+
+    setStatus('OCR 분석 중: ' + f.name);
+    var ocrResp = await callClaude({
+      model: 'claude-opus-4-8',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
+          { type: 'text', text: '이 이미지에서 모든 텍스트를 추출해 주세요. 텍스트만 그대로 출력하고 설명이나 주석은 일절 추가하지 마세요. 이미지에 보이는 모든 글자, 숫자, 영문을 빠짐없이 추출하세요.' }
+        ]
+      }]
+    });
+
+    var ocrText = ocrResp.content && ocrResp.content[0] ? ocrResp.content[0].text : '';
+    f.ocrText = ocrText;
+
+    if (!ocrText.trim()) {
+      throw new Error('이미지에서 텍스트를 추출하지 못했습니다. 이미지에 텍스트가 없거나 너무 작을 수 있습니다.');
+    }
+
+    setStatus('위반 검토 중: ' + f.name);
+    var catInfo = RULES_MAP[currentCategory];
+    var analysisPrompt = '당신은 한국 ' + catInfo.name + ' 표시\xB7광고 법규 전문 검수 시스템입니다.\n\n아래는 적용 법규 기준입니다:\n' + catInfo.rules + '\n\n아래는 상세페이지 이미지에서 OCR로 추출한 텍스트입니다:\n---\n' + ocrText + '\n---\n\n위 법규 기준에 따라 OCR 텍스트에서 금지표현 또는 위반 표현을 모두 찾아주세요.\n- 직접적인 금지표현뿐 아니라 동일한 의미를 다른 표현으로 나타난 경우도 포함합니다.\n- 영어나 한자로 표현된 경우도 포함합니다.\n- 문맥과 상관없이 해당 단어/표현이 포함되면 위반으로 판단합니다.\n\n반드시 아래 JSON 형식으로만 답변하세요. 다른 설명은 일절 추가하지 마세요:\n{\n  "violations": [\n    {\n      "forbidden_phrase": "금지 표현명",\n      "detected_text": "OCR에서 발견된 실제 문장 (최대 50자)",\n      "category": "위반 카테고리",\n      "law_reference": "관련 법조항",\n      "reason": "위반 사유 (1-2문장)"\n    }\n  ],\n  "ocr_length": 추출된_텍스트_글자수,\n  "summary": "검수 결과 요약 (1문장)"\n}\nviolations가 없으면 빈 배열 []을 반환하세요.';
+
+    var analysisResp = await callClaude({
+      model: 'claude-opus-4-8',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: analysisPrompt }]
+    });
+
+    var rawText = analysisResp.content && analysisResp.content[0] ? analysisResp.content[0].text : '';
+    var parsed;
+    try {
+      var jsonMatch = rawText.match(/```(?:json)?\s*([\s\S]*?)```/);
+      var jsonStr = jsonMatch ? jsonMatch[1] : rawText;
+      // Try to extract JSON object if there's surrounding text
+      var objMatch = jsonStr.match(/\{[\s\S]*\}/);
+      if (objMatch) jsonStr = objMatch[0];
+      parsed = JSON.parse(jsonStr.trim());
+    } catch(e) {
+      throw new Error('AI 응답 파싱 오류: ' + rawText.slice(0, 300));
+    }
+
+    f.result = parsed;
+    f.status = 'done';
+    var n = parsed.violations ? parsed.violations.length : 0;
+    setStatus('검수 완료: ' + f.name + ' — ' + n + '건 위반 발견');
+
+  } catch(err) {
+    f.status = 'done';
+    f.error = formatError(err.message || String(err));
+    setStatus('오류 발생: ' + f.name);
+  }
+
+  renderFileList();
+  if (f.id === activeFileId) renderContent();
+}
+
+async function callClaude(payload) {
+  var resp = await fetch('/api', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  var data = await resp.json();
+  if (!resp.ok) {
+    var msg = (data && data.error && data.error.message) ? data.error.message : (data && data.error ? data.error : JSON.stringify(data));
+    throw new Error('API 오류 (' + resp.status + '): ' + msg);
+  }
+  if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
+  return data;
+}
+
+function formatError(msg) {
+  if (/ECONNRESET|ECONNREFUSED|ETIMEDOUT|방화벽|차단/.test(msg)) {
+    return '회사 방화벽이 api.anthropic.com 연결을 차단하고 있습니다. IT팀에 api.anthropic.com:443 포트 허용 요청이 필요합니다.\n\n원본 오류: ' + msg;
+  }
+  return msg;
+}
+
+// ─── IMAGE COMPRESSION ────────────────────────────────────────────────────────
+
+function compressImage(file, maxWidth, quality) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function() {
+      URL.revokeObjectURL(url);
+      var w = img.width, h = img.height;
+      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+}
+
+// ─── UI HELPERS ───────────────────────────────────────────────────────────────
+
+function setStatus(text) { document.getElementById('statusText').textContent = text; }
+function setProgress(pct) { document.getElementById('progressBar').style.width = pct + '%'; }
+
+function updateButtons() {
+  var hasFiles = files.length > 0;
+  var hasCat = !!currentCategory;
+  document.getElementById('btnStart').disabled = isRunning || !hasFiles || !hasCat || !activeFileId;
+  document.getElementById('btnAll').disabled = isRunning || !hasFiles || !hasCat;
+  if (!isRunning) {
+    if (!hasCat) setStatus('카테고리를 선택하세요');
+    else if (!hasFiles) setStatus('이미지를 업로드하세요');
+    else setStatus(files.length + '개 이미지 준비됨. 검수를 시작하세요.');
+  }
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>

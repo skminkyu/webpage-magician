@@ -285,16 +285,8 @@ document.addEventListener('DOMContentLoaded', function() {
     this.value = '';
   });
 
-  document.getElementById('keyBtn').addEventListener('click', openKeyModal);
-  document.getElementById('keyCancel').addEventListener('click', closeKeyModal);
-  document.getElementById('keySave').addEventListener('click', saveKey);
   document.getElementById('btnStart').addEventListener('click', startInspection);
   document.getElementById('btnAll').addEventListener('click', inspectAll);
-
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !document.getElementById('keyModal').classList.contains('hidden')) saveKey();
-    if (e.key === 'Escape') closeKeyModal();
-  });
 });
 
 // ─── KEY MANAGEMENT ───────────────────────────────────────────────────────────
@@ -305,44 +297,18 @@ async function checkKey() {
     var d = await r.json();
     var dot = document.getElementById('keyDot');
     var label = document.getElementById('keyLabel');
-    var mask = document.getElementById('keyMask');
+    var banner = document.getElementById('noKeyBanner');
     if (d.exists) {
       dot.classList.add('ok');
-      label.textContent = 'API 키 설정됨';
-      mask.classList.remove('hidden');
-      mask.textContent = 'sk-ant-••••••';
+      label.textContent = d.source === 'env' ? '환경변수 설정됨' : 'API 키 설정됨';
+      if (banner) banner.style.display = 'none';
     } else {
       dot.classList.remove('ok');
-      label.textContent = 'API 키 없음';
-      mask.classList.add('hidden');
+      label.textContent = '키 없음';
+      if (banner) banner.style.display = 'block';
     }
   } catch(e) {}
   updateButtons();
-}
-
-function openKeyModal() {
-  document.getElementById('keyModal').classList.remove('hidden');
-  document.getElementById('keyInput').value = '';
-  setTimeout(function() { document.getElementById('keyInput').focus(); }, 50);
-}
-
-function closeKeyModal() {
-  document.getElementById('keyModal').classList.add('hidden');
-}
-
-async function saveKey() {
-  var key = document.getElementById('keyInput').value.trim();
-  if (!key.startsWith('sk-')) { alert('유효한 Anthropic API 키를 입력하세요 (sk- 로 시작)'); return; }
-  try {
-    var r = await fetch('/save-key', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: key })
-    });
-    var d = await r.json();
-    if (d.ok) { closeKeyModal(); checkKey(); }
-    else alert('저장 실패: ' + (d.error || '알 수 없는 오류'));
-  } catch(e) { alert('저장 실패: ' + e.message); }
 }
 
 // ─── CATEGORY ─────────────────────────────────────────────────────────────────

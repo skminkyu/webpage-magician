@@ -147,6 +147,12 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: monospace; outline: none; }
 .modal-input:focus { border-color: var(--accent); }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
+.url-input-row { display: flex; gap: 8px; margin-top: 10px; }
+.url-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; color: var(--text); font-size: 12px; outline: none; }
+.url-input:focus { border-color: var(--accent); }
+.url-input::placeholder { color: var(--text3); }
+.btn-url-add { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: all .15s; }
+.btn-url-add:hover { border-color: var(--accent); color: var(--accent); }
 .hidden { display: none !important; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -229,6 +235,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
         <div class="drop-text"><strong>클릭</strong>하거나 이미지를 드래그하여 업로드</div>
         <div class="drop-sub">JPG, PNG, WebP, GIF 등 · 여러 파일 동시 업로드 가능</div>
       </div>
+      <div class="url-input-row">
+        <input class="url-input" type="text" id="urlInput" placeholder="이미지 URL 붙여넣기 (https://...jpg)">
+        <button class="btn-url-add" id="btnUrlAdd">추가</button>
+      </div>
     </div>
     <div class="content-area" id="contentArea">
       <div class="empty-state" id="emptyState">
@@ -301,9 +311,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('btnStart').addEventListener('click', startInspection);
   document.getElementById('btnAll').addEventListener('click', inspectAll);
+
+  document.getElementById('btnUrlAdd').addEventListener('click', addImageUrl);
+  document.getElementById('urlInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') addImageUrl();
+  });
 });
 
 // ─── KEY MANAGEMENT ───────────────────────────────────────────────────────────
+
+async function addImageUrl() {
+  var raw = document.getElementById('urlInput').value.trim();
+  if (!raw) return;
+  document.getElementById('urlInput').value = '';
+
+  var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
+  var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
+  if (name.length > 60) name = name.slice(0, 60);
+
+  setStatus('이미지 URL 로딩 중...');
+  try {
+    var resp = await fetch(proxyUrl);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var blob = await resp.blob();
+    if (!blob.type.startsWith('image/')) throw new Error('이미지가 아닌 응답: ' + blob.type);
+    var file = new File([blob], name, { type: blob.type });
+    handleFiles([file]);
+    setStatus('URL 이미지 추가됨: ' + name);
+  } catch(e) {
+    alert('이미지 로딩 실패: ' + e.message + '\n\n이미지 직접 주소(jpg/png/avif 등)인지 확인하세요.');
+    setStatus('URL 로딩 실패');
+  }
+}
 
 function openKeyModal() {
   document.getElementById('keyInput').value = '';

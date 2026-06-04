@@ -45,6 +45,7 @@ function callAnthropic(apiKey, payload, callback) {
       method:   'POST',
       headers:  reqHeaders,
       rejectUnauthorized: false,
+      insecureHTTPParser: true,
     };
     if (socket) options.socket = socket;
 

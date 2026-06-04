@@ -150,7 +150,41 @@ const server = http.createServer((req, res) => {
     lawReq.end();
     return;
   }
-
+  // 이미지 URL 프록시
+  if (parsed.pathname === '/fetch-image' && req.method === 'GET') {
+    const imgUrl = parsed.query.url;
+    if (!imgUrl) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'url 파라미터가 필요합니다.' }));
+      return;
+    }
+    let parsedUrl;
+    try { parsedUrl = new URL(imgUrl); } catch(e) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '유효하지 않은 URL입니다.' }));
+      return;
+    }
+    const protocol = parsedUrl.protocol === 'https:' ? https : require('http');
+    const imgReq = protocol.request({
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': parsedUrl.origin },
+    }, imgRes => {
+      const ct = imgRes.headers['content-type'] || 'image/jpeg';
+      res.writeHead(imgRes.statusCode, {
+        'Content-Type': ct,
+        'Cache-Control': 'public, max-age=86400',
+      });
+      imgRes.pipe(res);
+    });
+    imgReq.on('error', e => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    imgReq.end();
+    return;
+  }
   // 정적 파일 서빙
   let filePath = parsed.pathname === '/' ? '/index.html' : parsed.pathname;
   filePath = path.join(__dirname, decodeURIComponent(filePath));

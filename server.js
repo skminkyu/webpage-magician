@@ -152,7 +152,7 @@ const server = http.createServer((req, res) => {
   }
 
   // 정적 파일 서빙
-  let filePath = parsed.pathname === '/' ? '/검수도구.html' : parsed.pathname;
+  let filePath = parsed.pathname === '/' ? '/index.html' : parsed.pathname;
   filePath = path.join(__dirname, decodeURIComponent(filePath));
   const ext = path.extname(filePath);
 

@@ -160,6 +160,51 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // 법령 API 프록시 (law.go.kr)
+  if (parsed.pathname === '/law-api' && req.method === 'GET') {
+    const queryParams = Object.assign({}, parsed.query);
+    const service = queryParams.service;
+    if (!service) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'service 파라미터가 필요합니다.' }));
+      return;
+    }
+    delete queryParams.service;
+
+    // 나머지 쿼리 파라미터 조합
+    const restParams = Object.entries(queryParams)
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('&');
+
+    const lawPath = `/DRF/${service}.do?OC=lawcheck&type=JSON${restParams ? '&' + restParams : ''}`;
+
+    const lawOptions = {
+      hostname: 'www.law.go.kr',
+      path: lawPath,
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
+      rejectUnauthorized: false,
+    };
+
+    const lawReq = https.request(lawOptions, lawRes => {
+      let data = '';
+      lawRes.on('data', d => data += d);
+      lawRes.on('end', () => {
+        res.writeHead(lawRes.statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(data);
+      });
+    });
+    lawReq.on('error', e => {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: e.message }));
+    });
+    lawReq.end();
+    return;
+  }
+
   // 정적 파일 서빙
   let filePath = parsed.pathname === '/' ? '/검수도구.html' : parsed.pathname;
   filePath = path.join(__dirname, decodeURIComponent(filePath));
@@ -176,9 +221,9 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   const proxy = getProxy();
   console.log('');
-  console.log('  ✅ 상세페이지 검수 도구 서버 실행 중');
-  if (proxy) console.log(`  🔗 프록시 사용: ${proxy}`);
-  else       console.log('  🌐 직접 연결 모드 (프록시 없음)');
+  console.log('  상세페이지 검수 도구 서버 실행 중');
+  if (proxy) console.log(`  프록시 사용: ${proxy}`);
+  else       console.log('  직접 연결 모드 (프록시 없음)');
   console.log('');
   console.log(`  브라우저 주소: http://localhost:${PORT}`);
   console.log('');

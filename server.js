@@ -117,7 +117,7 @@ const server = http.createServer((req, res) => {
     req.on('end', () => {
       try {
         const { key } = JSON.parse(body);
-        fs.writeFileSync(KEY_FILE, key.replace(/\s/g, ''));
+        fs.writeFileSync(KEY_FILE, key.replace(/[^a-zA-Z0-9\-_]/g, ''));
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ok: true }));
       } catch (e) {
@@ -142,7 +142,7 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'API 키가 저장되지 않았습니다.' }));
       return;
     }
-    const apiKey = fs.readFileSync(KEY_FILE, 'utf8').replace(/\s/g, '');
+    const apiKey = fs.readFileSync(KEY_FILE, 'utf8').replace(/[^a-zA-Z0-9\-_]/g, '');
     let body = '';
     req.on('data', d => body += d);
     req.on('end', () => {

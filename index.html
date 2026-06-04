@@ -638,6 +638,7 @@ function formatError(msg) {
 // ─── IMAGE COMPRESSION ────────────────────────────────────────────────────────
 
 function compressImage(file, maxWidth, quality) {
+  var MAX_H = 7900;
   return new Promise(function(resolve, reject) {
     var img = new Image();
     var url = URL.createObjectURL(file);
@@ -645,6 +646,7 @@ function compressImage(file, maxWidth, quality) {
       URL.revokeObjectURL(url);
       var w = img.width, h = img.height;
       if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+      if (h > MAX_H) { w = Math.round(w * MAX_H / h); h = MAX_H; }
       var canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       var ctx = canvas.getContext('2d');

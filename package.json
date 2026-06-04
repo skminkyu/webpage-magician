@@ -1,0 +1,12 @@
+{
+  "name": "webpage-magician",
+  "version": "1.0.0",
+  "description": "상세페이지 광고 검수 시스템",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

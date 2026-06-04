@@ -596,19 +596,21 @@ async function inspectFile(f) {
   setStatus('OCR 추출 중: ' + f.name);
 
   try {
-    var compressed = await compressImage(f.file, 1200, 0.82);
-    var b64 = compressed.split(',')[1];
-
-    setStatus('OCR 분석 중: ' + f.name);
-    var ocrResp = await callClaude({
-      model: 'claude-opus-4-8',
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } },
-          { type: 'text', text: '이 이미지에서 모든 텍스트를 추출해 주세요. 텍스트만 그대로 출력하고 설명이나 주석은 일절 추가하지 마세요. 이미지에 보이는 모든 글자, 숫자, 영문을 빠짐없이 추출하세요.' }
-        ]
+   var tiles = await splitImageTiles(f.file, 1200, 0.88);
+var ocrParts = [];
+for (var ti = 0; ti < tiles.length; ti++) {
+  setStatus('OCR 분석 중 (' + (ti+1) + '/' + tiles.length + '구간): ' + f.name);
+  var ocrResp = await callClaude({
+    model: 'claude-opus-4-8', max_tokens: 4096,
+    messages: [{ role: 'user', content: [
+      { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: tiles[ti] } },
+      { type: 'text', text: '이 이미지에서 모든 텍스트를 추출해 주세요. 텍스트만 그대로 출력하고 설명이나 주석은 일절 추가하지 마세요. 이미지에 보이는 모든 글자, 숫자, 영문을 빠짐없이 추출하세요.' }
+    ]}]
+  });
+  var part = ocrResp.content && ocrResp.content[0] ? ocrResp.content[0].text : '';
+  if (part.trim()) ocrParts.push(part.trim());
+}
+var ocrText = ocrParts.join('\n');
       }]
     });
 
@@ -681,24 +683,41 @@ function formatError(msg) {
 
 // ─── IMAGE COMPRESSION ────────────────────────────────────────────────────────
 
-function compressImage(file, maxWidth, quality) {
-  var MAX_H = 7900;
+function splitImageTiles(file, maxWidth, quality) {
+  var TILE_H = 2000;
+  var OVERLAP = 150;
   return new Promise(function(resolve, reject) {
     var img = new Image();
     var url = URL.createObjectURL(file);
     img.onload = function() {
       URL.revokeObjectURL(url);
-      var w = img.width, h = img.height;
-      if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
-      if (h > MAX_H) { w = Math.round(w * MAX_H / h); h = MAX_H; }
-      var canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
+      var srcW = img.width, srcH = img.height;
+      var scale = srcW > maxWidth ? maxWidth / srcW : 1;
+      var dstW = Math.round(srcW * scale);
+      var dstH = Math.round(srcH * scale);
+      var tiles = [];
+      if (dstH <= TILE_H) {
+        var c = document.createElement('canvas');
+        c.width = dstW; c.height = dstH;
+        c.getContext('2d').drawImage(img, 0, 0, dstW, dstH);
+        tiles.push(c.toDataURL('image/jpeg', quality).split(',')[1]);
+        resolve(tiles); return;
+      }
+      var y = 0;
+      while (y < dstH) {
+        var tH = Math.min(TILE_H, dstH - y);
+        var c = document.createElement('canvas');
+        c.width = dstW; c.height = tH;
+        var srcY = Math.round(y / scale);
+        var srcTH = Math.round(tH / scale);
+        c.getContext('2d').drawImage(img, 0, srcY, srcW, srcTH, 0, 0, dstW, tH);
+        tiles.push(c.toDataURL('image/jpeg', quality).split(',')[1]);
+        if (y + TILE_H >= dstH) break;
+        y += TILE_H - OVERLAP;
+      }
+      resolve(tiles);
     };
-    img.onerror = reject;
-    img.src = url;
+    img.onerror = reject; img.src = url;
   });
 }
 

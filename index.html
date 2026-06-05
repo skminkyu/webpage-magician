@@ -308,35 +308,33 @@ async function fetchLawFromApi(query, target) {
   var searchRes = await fetch(searchUrl);
   if (!searchRes.ok) throw new Error('search HTTP ' + searchRes.status);
   var searchData = await searchRes.json();
+  console.log('[LawAPI] search result for "' + query + '":', JSON.stringify(searchData).slice(0, 500));
 
-  // law.go.kr은 법령/행정규칙/자치법규 등 타입마다 배열 키 이름이 다름
+  // law.go.kr 응답 구조: 검색 유형에 따라 배열 키가 다를 수 있음
   var searchRoot = searchData.LawSearch || searchData;
-  var laws = searchRoot.law || searchRoot['행정규칙'] || searchRoot['자치법규'];
-  if (!laws) throw new Error('검색 결과 없음: ' + query);
+  // 법령수가 0이면 결과 없음
+  var totalCount = parseInt(searchRoot['@전체건수'] || searchRoot['전체건수'] || '0', 10);
+  var laws = searchRoot.law || searchRoot['행정규칙'];
+  if (!laws && totalCount === 0) throw new Error('검색 결과 없음 (0건): ' + query);
+  if (!laws) throw new Error('검색 결과 파싱 실패 (키 없음): ' + JSON.stringify(Object.keys(searchRoot)));
   if (!Array.isArray(laws)) laws = [laws];
   if (laws.length === 0) throw new Error('검색 결과 없음: ' + query);
 
   var queryFirst = query.split(' ')[0];
-  function getLawName(l) { return l['법령명'] || l['행정규칙명'] || l['자치법규명'] || ''; }
+  function getLawName(l) { return l['법령명'] || l['행정규칙명'] || ''; }
   var match = laws.find(function(l) { return getLawName(l).includes(queryFirst); }) || laws[0];
-  var mst = match['MST'] || match['행정규칙MST'] || match['자치법규MST'];
-  if (!mst) throw new Error('MST 없음');
+  var mst = match['MST'];
+  if (!mst) throw new Error('MST 없음. 항목 키: ' + JSON.stringify(Object.keys(match)));
 
-  // 행정규칙(고시/훈령/예규)은 admrulService, 법령은 lawService
-  var contentService = target === 'admrul' ? 'admrulService' : 'lawService';
-  var contentUrl = '/law-api?service=' + contentService + '&MST=' + mst;
+  // lawService.do 로 조문 조회 (고시도 동일)
+  var contentUrl = '/law-api?service=lawService&MST=' + mst;
   var contentRes = await fetch(contentUrl);
-  if (!contentRes.ok) {
-    // fallback to lawService
-    contentUrl = '/law-api?service=lawService&MST=' + mst;
-    contentRes = await fetch(contentUrl);
-    if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
-  }
+  if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
   var contentData = await contentRes.json();
+  console.log('[LawAPI] content result for MST=' + mst + ':', JSON.stringify(contentData).slice(0, 500));
 
-  // 응답 루트 키도 타입마다 다름
-  var law = contentData['법령'] || contentData['행정규칙'] || contentData['자치법규'];
-  if (!law) throw new Error('법령 데이터 없음');
+  var law = contentData['법령'] || contentData['행정규칙'];
+  if (!law) throw new Error('조문 데이터 없음. 루트 키: ' + JSON.stringify(Object.keys(contentData)));
 
   var info = law['기본정보'] || {};
   var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getLawName(match) || query;
@@ -399,13 +397,20 @@ async function loadLawsFromApi() {
       RULES_MAP.chemical.rules = CHEMICAL_RULES;
     }
 
+    var failed = [];
+    if (envResult.status === 'rejected') failed.push('환경성고시: ' + envResult.reason.message);
+    if (chemRegResult.status === 'rejected') failed.push('생활화학규정: ' + chemRegResult.reason.message);
+    if (chemLawResult.status === 'rejected') failed.push('생활화학법: ' + chemLawResult.reason.message);
+    if (failed.length) console.warn('[LawAPI] 실패:', failed);
+
     if (loaded.length > 0) {
       setBadge('법령 API 로드: ' + loaded.join(', '), 'loaded');
     } else {
-      setBadge('법령 API 로드 실패 (기본값 적용)', 'failed');
+      setBadge('법령 API 실패: ' + (failed[0] || '알 수 없는 오류') + ' (기본값 적용)', 'failed');
     }
   } catch(e) {
-    setBadge('법령 API 오류 (기본값 적용)', 'failed');
+    console.error('[LawAPI] 전체 오류:', e);
+    setBadge('법령 API 오류: ' + e.message + ' (기본값 적용)', 'failed');
   }
 }
 

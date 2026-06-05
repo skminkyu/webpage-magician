@@ -497,6 +497,18 @@ async function addImageUrl() {
   if (!raw) return;
   document.getElementById('urlInput').value = '';
 
+  // CDN 변환 파라미터 자동 제거
+  // 1) /proxy/src/{원본URL}/... 패턴에서 원본 URL 추출
+  var proxyMatch = raw.match(/\/proxy\/src\/(https?:\/\/.+?)(?:\/hdims\/|\/format\/|\/optimize|$)/);
+  if (proxyMatch) {
+    raw = proxyMatch[1];
+  } else {
+    // 2) /hdims/, /format/, /optimize 등 CDN 변환 suffix 제거
+    raw = raw.replace(/\/hdims\/.*$/, '')
+             .replace(/\/format\/[^?#]*/, '')
+             .replace(/\/optimize[^?#]*/, '');
+  }
+
   var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
   var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
   if (name.length > 60) name = name.slice(0, 60);

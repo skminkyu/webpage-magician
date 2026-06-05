@@ -153,6 +153,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .url-input::placeholder { color: var(--text3); }
 .btn-url-add { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: all .15s; }
 .btn-url-add:hover { border-color: var(--accent); color: var(--accent); }
+.law-api-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text3); margin-top: 8px; padding: 3px 8px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border); }
+.law-api-badge.loaded { color: var(--green); border-color: rgba(52,211,153,0.3); }
+.law-api-badge.failed { color: var(--yellow); border-color: rgba(251,191,36,0.3); }
+.law-api-badge .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .hidden { display: none !important; }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -225,6 +229,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
     <div class="left-section">
       <div class="left-section-title">적용 법규 요약</div>
       <div class="rules-box" id="rulesSummary">카테고리를 선택하면 적용 법규 요약이 표시됩니다.</div>
+      <div class="law-api-badge" id="lawApiStatus"><div class="badge-dot"></div><span>법령 API 로딩 중...</span></div>
     </div>
     <div class="left-section" style="border-bottom:none; padding-bottom:6px;">
       <div class="left-section-title">업로드된 이미지 (<span id="fileCount">0</span>)</div>
@@ -288,6 +293,103 @@ var RULES_MAP = {
   chemical:  { rules: CHEMICAL_RULES,  name: '생활화학제품', label: '생활화학제품 및 살생물제의 안전관리에 관한 법률 (법 제20조 등)' }
 };
 
+// ─── LAW API ──────────────────────────────────────────────────────────────────
+
+async function fetchLawFromApi(query, target) {
+  var searchUrl = '/law-api?service=lawSearch&query=' + encodeURIComponent(query) + '&target=' + target + '&display=5&page=1';
+  var searchRes = await fetch(searchUrl);
+  if (!searchRes.ok) throw new Error('search HTTP ' + searchRes.status);
+  var searchData = await searchRes.json();
+
+  var laws = searchData.LawSearch && searchData.LawSearch.law;
+  if (!laws) throw new Error('검색 결과 없음: ' + query);
+  if (!Array.isArray(laws)) laws = [laws];
+  if (laws.length === 0) throw new Error('검색 결과 없음: ' + query);
+
+  var queryFirst = query.split(' ')[0];
+  var match = laws.find(function(l) { return (l['법령명'] || '').includes(queryFirst); }) || laws[0];
+  var mst = match['MST'];
+  if (!mst) throw new Error('MST 없음');
+
+  var contentUrl = '/law-api?service=lawService&MST=' + mst;
+  var contentRes = await fetch(contentUrl);
+  if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
+  var contentData = await contentRes.json();
+
+  var law = contentData['법령'];
+  if (!law) throw new Error('법령 데이터 없음');
+
+  var info = law['기본정보'] || {};
+  var lawName = info['법령명_한글'] || info['법령명한글'] || match['법령명'] || query;
+  var enfDate = info['시행일자'] || '';
+
+  var articles = law['조문'] && law['조문']['조문단위'];
+  if (!articles) return { name: lawName, date: enfDate, text: '' };
+  if (!Array.isArray(articles)) articles = [articles];
+
+  var adKeywords = ['표시', '광고', '금지', '위반', '과장', '허위', '오인', '거짓', '부당'];
+  var relevant = articles.filter(function(art) {
+    var haystack = (art['조제목'] || '') + (art['조문내용'] || '');
+    return adKeywords.some(function(kw) { return haystack.includes(kw); });
+  });
+  var targetArts = relevant.length > 0 ? relevant : articles.slice(0, 15);
+
+  var text = '[' + lawName + (enfDate ? ' · 시행 ' + enfDate + ']' : ']') + '\n\n';
+  targetArts.forEach(function(art) {
+    var num = art['조번호'] || '';
+    var title = art['조제목'] ? ' (' + art['조제목'] + ')' : '';
+    var content = (art['조문내용'] || '').trim();
+    if (content) text += '제' + num + '조' + title + '\n' + content + '\n\n';
+  });
+
+  return { name: lawName, date: enfDate, text: text.trim() };
+}
+
+async function loadLawsFromApi() {
+  var badge = document.getElementById('lawApiStatus');
+  function setBadge(msg, cls) {
+    badge.className = 'law-api-badge' + (cls ? ' ' + cls : '');
+    badge.innerHTML = '<div class="badge-dot"></div><span>' + msg + '</span>';
+  }
+
+  try {
+    var [envResult, chemRegResult, chemLawResult] = await Promise.allSettled([
+      fetchLawFromApi('환경성 표시광고 관리제도에 관한 고시', 'admrul'),
+      fetchLawFromApi('생활화학제품 등의 표시광고에 관한 규정', 'admrul'),
+      fetchLawFromApi('생활화학제품 및 살생물제의 안전관리에 관한 법률', 'law')
+    ]);
+
+    var loaded = [];
+
+    if (envResult.status === 'fulfilled' && envResult.value.text) {
+      COMMON_RULES = envResult.value.text;
+      loaded.push('환경성고시');
+    }
+
+    var chemParts = [];
+    if (chemRegResult.status === 'fulfilled' && chemRegResult.value.text) {
+      chemParts.push(chemRegResult.value.text);
+      loaded.push('생활화학규정');
+    }
+    if (chemLawResult.status === 'fulfilled' && chemLawResult.value.text) {
+      chemParts.push(chemLawResult.value.text);
+      loaded.push('생활화학제품법');
+    }
+    if (chemParts.length > 0) {
+      CHEMICAL_RULES = chemParts.join('\n\n');
+      RULES_MAP.chemical.rules = CHEMICAL_RULES;
+    }
+
+    if (loaded.length > 0) {
+      setBadge('법령 API 로드: ' + loaded.join(', '), 'loaded');
+    } else {
+      setBadge('법령 API 로드 실패 (기본값 적용)', 'failed');
+    }
+  } catch(e) {
+    setBadge('법령 API 오류 (기본값 적용)', 'failed');
+  }
+}
+
 var RULES_SUMMARY = {
   cosmetics: "적용: 화장품법 제13조 / 식약처 고시\n\n주요 금지 영역:\n• 의학적 효능효과 (아토피, 항염, 항균 등)\n• 피부·모발 생리활성 표현 (피부재생, 발모 등)\n• 기능성화장품 미심사 기능 표방 (미백, 주름개선 등)\n• 의약품 오인 표현 (보톡스, 필러 등)\n• 신체 개선 표현 (다이어트, V라인 등)\n• 인체 유래 성분 (줄기세포, 엑소좀 등)\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
   food: "적용: 식품등의 표시·광고에 관한 법률\n\n주요 금지 영역:\n• 질병 예방·치료 효과 표방 (암, 당뇨, 혈압 등)\n• 의약품 오인·혼동 표현\n• 건강기능식품으로 오인될 수 있는 표현\n• 허위·과장 표현 (100% 보장, 특효 등)\n• 특정인·기관 추천 표현\n• 허위 다이어트·체중 표현\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
@@ -306,6 +408,7 @@ var isRunning = false;
 
 document.addEventListener('DOMContentLoaded', function() {
   checkKey();
+  loadLawsFromApi();
   if (currentCategory) selectCategory(currentCategory);
 
   var dz = document.getElementById('dropZone');

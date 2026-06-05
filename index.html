@@ -225,6 +225,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
           <div class="cat-law">생활화학제품 및 살생물제 안전관리법</div>
         </div>
       </button>
+      <button class="cat-btn" data-cat="common" onclick="selectCategory('common')">
+        <span class="cat-icon">🌿</span>
+        <div class="cat-info">
+          <div class="cat-name">공통 (환경성)</div>
+          <div class="cat-law">환경성 표시·광고 관리제도에 관한 고시</div>
+        </div>
+      </button>
     </div>
     <div class="left-section">
       <div class="left-section-title">적용 법규 요약</div>
@@ -290,7 +297,8 @@ var RULES_MAP = {
   cosmetics: { rules: COSMETICS_RULES, name: '화장품', label: '화장품법 제13조 / 화장품 표시·광고 관리 지침 (식약처 2025.8.14)' },
   food:      { rules: FOOD_RULES,      name: '일반식품', label: '식품등의 표시·광고에 관한 법률 (법 제8조 등)' },
   hfc:       { rules: HFC_RULES,       name: '건강기능식품', label: '건강기능식품에 관한 법률 (법 제18조 등)' },
-  chemical:  { rules: CHEMICAL_RULES,  name: '생활화학제품', label: '생활화학제품 및 살생물제의 안전관리에 관한 법률 (법 제20조 등)' }
+  chemical:  { rules: CHEMICAL_RULES,  name: '생활화학제품', label: '생활화학제품 및 살생물제의 안전관리에 관한 법률 (법 제20조 등)' },
+  common:    { rules: null,            name: '공통(환경성)', label: '환경성 표시·광고 관리제도에 관한 고시 (환경부/공정거래위원회)' }
 };
 
 // ─── LAW API ──────────────────────────────────────────────────────────────────
@@ -301,27 +309,38 @@ async function fetchLawFromApi(query, target) {
   if (!searchRes.ok) throw new Error('search HTTP ' + searchRes.status);
   var searchData = await searchRes.json();
 
-  var laws = searchData.LawSearch && searchData.LawSearch.law;
+  // law.go.kr은 법령/행정규칙/자치법규 등 타입마다 배열 키 이름이 다름
+  var searchRoot = searchData.LawSearch || searchData;
+  var laws = searchRoot.law || searchRoot['행정규칙'] || searchRoot['자치법규'];
   if (!laws) throw new Error('검색 결과 없음: ' + query);
   if (!Array.isArray(laws)) laws = [laws];
   if (laws.length === 0) throw new Error('검색 결과 없음: ' + query);
 
   var queryFirst = query.split(' ')[0];
-  var match = laws.find(function(l) { return (l['법령명'] || '').includes(queryFirst); }) || laws[0];
-  var mst = match['MST'];
+  function getLawName(l) { return l['법령명'] || l['행정규칙명'] || l['자치법규명'] || ''; }
+  var match = laws.find(function(l) { return getLawName(l).includes(queryFirst); }) || laws[0];
+  var mst = match['MST'] || match['행정규칙MST'] || match['자치법규MST'];
   if (!mst) throw new Error('MST 없음');
 
-  var contentUrl = '/law-api?service=lawService&MST=' + mst;
+  // 행정규칙(고시/훈령/예규)은 admrulService, 법령은 lawService
+  var contentService = target === 'admrul' ? 'admrulService' : 'lawService';
+  var contentUrl = '/law-api?service=' + contentService + '&MST=' + mst;
   var contentRes = await fetch(contentUrl);
-  if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
+  if (!contentRes.ok) {
+    // fallback to lawService
+    contentUrl = '/law-api?service=lawService&MST=' + mst;
+    contentRes = await fetch(contentUrl);
+    if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
+  }
   var contentData = await contentRes.json();
 
-  var law = contentData['법령'];
+  // 응답 루트 키도 타입마다 다름
+  var law = contentData['법령'] || contentData['행정규칙'] || contentData['자치법규'];
   if (!law) throw new Error('법령 데이터 없음');
 
   var info = law['기본정보'] || {};
-  var lawName = info['법령명_한글'] || info['법령명한글'] || match['법령명'] || query;
-  var enfDate = info['시행일자'] || '';
+  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getLawName(match) || query;
+  var enfDate = info['시행일자'] || info['발령일자'] || '';
 
   var articles = law['조문'] && law['조문']['조문단위'];
   if (!articles) return { name: lawName, date: enfDate, text: '' };
@@ -394,7 +413,8 @@ var RULES_SUMMARY = {
   cosmetics: "적용: 화장품법 제13조 / 식약처 고시\n\n주요 금지 영역:\n• 의학적 효능효과 (아토피, 항염, 항균 등)\n• 피부·모발 생리활성 표현 (피부재생, 발모 등)\n• 기능성화장품 미심사 기능 표방 (미백, 주름개선 등)\n• 의약품 오인 표현 (보톡스, 필러 등)\n• 신체 개선 표현 (다이어트, V라인 등)\n• 인체 유래 성분 (줄기세포, 엑소좀 등)\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
   food: "적용: 식품등의 표시·광고에 관한 법률\n\n주요 금지 영역:\n• 질병 예방·치료 효과 표방 (암, 당뇨, 혈압 등)\n• 의약품 오인·혼동 표현\n• 건강기능식품으로 오인될 수 있는 표현\n• 허위·과장 표현 (100% 보장, 특효 등)\n• 특정인·기관 추천 표현\n• 허위 다이어트·체중 표현\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
   hfc: "적용: 건강기능식품에 관한 법률\n\n주요 금지 영역:\n• 인정받지 않은 기능성 표현\n• 질병 예방·치료 표방 (암, 당뇨, 치매 등)\n• 의약품 동등·대체 표현\n• 과장된 기능성 표현 (100%, 완벽 등)\n• 허가·인증 오인 표현\n• 특정인 추천·보증\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
-  chemical: "적용: 생활화학제품 및 살생물제 안전관리법\n\n주요 금지 영역:\n• 효능·효과 과장 (살균 99.9% 실증 없이 등)\n• 안전성 과장 (무독성, 인체 완전 무해 등)\n• 의약품·의약외품 오인 표현\n• 미승인 살생물 효과 표방\n• 인증·허가 오인 표현\n• 성분 허위·과장\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용"
+  chemical: "적용: 생활화학제품 및 살생물제 안전관리법\n\n주요 금지 영역:\n• 효능·효과 과장 (살균 99.9% 실증 없이 등)\n• 안전성 과장 (무독성, 인체 완전 무해 등)\n• 의약품·의약외품 오인 표현\n• 미승인 살생물 효과 표방\n• 인증·허가 오인 표현\n• 성분 허위·과장\n\n[공통] 환경성 표시광고 관리제도 고시도 함께 적용",
+  common: "적용: 환경성 표시·광고 관리제도에 관한 고시 (환경부/공정거래위원회)\n상품 카테고리 구분 없이 모든 제품에 공통 적용되는 환경성 표시·광고 기준입니다.\n\n주요 금지 영역:\n• 근거 없는 환경성 표시·광고 (친환경, 에코, 그린 등)\n• 분해성 과장·허위 표현 (생분해, 자연분해 등)\n• 재활용 과장·허위 표현\n• 탄소·온실가스 관련 과장 (탄소중립, 넷제로 등)\n• 무독성·무공해 과장 표현\n• 비교 환경성 허위·과장"
 };
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
@@ -768,7 +788,11 @@ async function inspectFile(f) {
 
     setStatus('위반 검토 중: ' + f.name);
     var catInfo = RULES_MAP[currentCategory];
-    var analysisPrompt = '당신은 한국 ' + catInfo.name + ' 표시\xB7광고 법규 전문 검수 시스템입니다.\n\n[적용 법규 1 - 카테고리별 규정]\n' + catInfo.rules + '\n\n[적용 법규 2 - 공통 규정 (모든 카테고리 적용)]\n' + COMMON_RULES + '\n\n아래는 상세페이지 이미지에서 OCR로 추출한 텍스트입니다:\n---\n' + ocrText + '\n---\n\n위 두 법규 기준 모두를 적용하여 OCR 텍스트에서 금지표현 또는 위반 표현을 모두 찾아주세요.\n- 직접적인 금지표현뿐 아니라 동일한 의미를 다른 표현으로 나타난 경우도 포함합니다.\n- 영어나 한자로 표현된 경우도 포함합니다.\n- 문맥과 상관없이 해당 단어/표현이 포함되면 위반으로 판단합니다.\n\n반드시 아래 JSON 형식으로만 답변하세요. 다른 설명은 일절 추가하지 마세요:\n{\n  "violations": [\n    {\n      "forbidden_phrase": "금지 표현명",\n      "detected_text": "OCR에서 발견된 실제 문장 (최대 50자)",\n      "category": "위반 카테고리",\n      "law_reference": "관련 법조항",\n      "reason": "위반 사유 (1-2문장)"\n    }\n  ],\n  "ocr_length": 추출된_텍스트_글자수,\n  "summary": "검수 결과 요약 (1문장)"\n}\nviolations가 없으면 빈 배열 []을 반환하세요.';
+    var isCommonOnly = currentCategory === 'common';
+    var rulesBlock = isCommonOnly
+      ? '[적용 법규 - 환경성 표시·광고 관리제도에 관한 고시 (공통 적용)]\n' + COMMON_RULES
+      : '[적용 법규 1 - 카테고리별 규정]\n' + catInfo.rules + '\n\n[적용 법규 2 - 공통 규정 (모든 카테고리 적용)]\n' + COMMON_RULES;
+    var analysisPrompt = '당신은 한국 ' + catInfo.name + ' 표시\xB7광고 법규 전문 검수 시스템입니다.\n\n' + rulesBlock + '\n\n아래는 상세페이지 이미지에서 OCR로 추출한 텍스트입니다:\n---\n' + ocrText + '\n---\n\n위 법규 기준을 적용하여 OCR 텍스트에서 금지표현 또는 위반 표현을 모두 찾아주세요.\n- 직접적인 금지표현뿐 아니라 동일한 의미를 다른 표현으로 나타난 경우도 포함합니다.\n- 영어나 한자로 표현된 경우도 포함합니다.\n- 문맥과 상관없이 해당 단어/표현이 포함되면 위반으로 판단합니다.\n\n반드시 아래 JSON 형식으로만 답변하세요. 다른 설명은 일절 추가하지 마세요:\n{\n  "violations": [\n    {\n      "forbidden_phrase": "금지 표현명",\n      "detected_text": "OCR에서 발견된 실제 문장 (최대 50자)",\n      "category": "위반 카테고리",\n      "law_reference": "관련 법조항",\n      "reason": "위반 사유 (1-2문장)"\n    }\n  ],\n  "ocr_length": 추출된_텍스트_글자수,\n  "summary": "검수 결과 요약 (1문장)"\n}\nviolations가 없으면 빈 배열 []을 반환하세요.';
 
     var analysisResp = await callClaude({
       model: 'claude-opus-4-8',

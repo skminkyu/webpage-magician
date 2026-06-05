@@ -344,14 +344,17 @@ async function fetchLawFromApi(query, target) {
   if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
   var contentData = await contentRes.json();
 
-  var law = contentData['법령'] || contentData['행정규칙'];
+  var law = contentData['법령'] || contentData['행정규칙'] || contentData['AdmRulService'];
   if (!law) throw new Error('조문 루트 없음. 키: ' + JSON.stringify(Object.keys(contentData)));
+  console.log('[LawAPI] law root keys:', JSON.stringify(Object.keys(law)));
 
-  var info = law['기본정보'] || {};
-  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getName(match) || query;
+  var info = law['기본정보'] || law['행정규칙기본정보'] || {};
+  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || info['제목'] || getName(match) || query;
   var enfDate = info['시행일자'] || info['발령일자'] || '';
 
-  var articles = law['조문'] && law['조문']['조문단위'];
+  var articles = (law['조문'] && law['조문']['조문단위'])
+               || (law['행정규칙조문'] && law['행정규칙조문']['조문단위'])
+               || law['조문단위'];
   if (!articles) return { name: lawName, date: enfDate, text: '' };
   if (!Array.isArray(articles)) articles = [articles];
 

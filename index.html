@@ -310,33 +310,27 @@ async function fetchLawFromApi(query, target) {
   var searchData = await searchRes.json();
 
   var isAdmrul = target === 'admrul';
-  // admrul → AdmRulSearch / law → LawSearch
   var searchRoot = isAdmrul ? searchData.AdmRulSearch : searchData.LawSearch;
-  if (!searchRoot) throw new Error('응답 루트 없음. 키: ' + JSON.stringify(Object.keys(searchData)));
+  if (!searchRoot) throw new Error('응답 루트 없음');
 
-  // admrul → items 키 'admrul' / law → 'law'
   var items = isAdmrul ? searchRoot.admrul : searchRoot.law;
-  if (!items) throw new Error('항목 없음 (totalCnt=' + (searchRoot.totalCnt || '?') + ')');
+  if (!items) throw new Error('항목 없음');
   if (!Array.isArray(items)) items = [items];
-  if (items.length === 0) throw new Error('검색 결과 0건: ' + query);
+  if (items.length === 0) throw new Error('검색 결과 0건');
 
   var queryFirst = query.split(' ')[0];
-  function getName(item) {
-    // admrul 아이템은 자기 자신의 이름 필드가 'admrul', law는 '법령명한글'
-    return item['admrul'] || item['법령명한글'] || item['법령명'] || '';
-  }
+  function getName(item) { return item['admrul'] || item['법령명한글'] || item['법령명'] || ''; }
   var match = items.find(function(i) { return getName(i).includes(queryFirst); }) || items[0];
 
   var contentUrl;
   if (isAdmrul) {
-    // admrul 조문 조회: ID=행정규칙일련번호, target=admrul
     var admrulId = match['행정규칙일련번호'];
-    if (!admrulId) throw new Error('행정규칙일련번호 없음. 키: ' + JSON.stringify(Object.keys(match)));
+    if (!admrulId) throw new Error('행정규칙일련번호 없음');
     contentUrl = '/law-api?service=lawService&target=admrul&ID=' + admrulId;
   } else {
-    // law 조문 조회: MST=법령일련번호
-    var mst = match['법령일련번호'];
-    if (!mst) throw new Error('법령일련번호 없음. 키: ' + JSON.stringify(Object.keys(match)));
+    // 법령일련번호 또는 법령ID 사용, 숫자만 추출해서 혹시 모를 :suffix 제거
+    var mst = (match['법령일련번호'] || match['법령ID'] || '').toString().replace(/[^0-9]/g, '');
+    if (!mst) throw new Error('법령일련번호 없음');
     contentUrl = '/law-api?service=lawService&MST=' + mst;
   }
 
@@ -345,39 +339,46 @@ async function fetchLawFromApi(query, target) {
   var contentData = await contentRes.json();
 
   var law = contentData['법령'] || contentData['행정규칙'] || contentData['AdmRulService'];
-  if (!law) throw new Error('조문 루트 없음. 키: ' + JSON.stringify(Object.keys(contentData)));
-  console.log('[LawAPI] law root keys:', JSON.stringify(Object.keys(law)));
+  if (!law) throw new Error('조문 루트 없음');
 
   var info = law['기본정보'] || law['행정규칙기본정보'] || {};
-  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || info['제목'] || getName(match) || query;
+  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getName(match) || query;
   var enfDate = info['시행일자'] || info['발령일자'] || '';
-
   var header = '[' + lawName + (enfDate ? ' · 시행 ' + enfDate + ']' : ']') + '\n\n';
 
-  // 구조화 조문(조문단위 배열)이 있으면 키워드 필터링, 없으면 조문내용 전문 사용
+  // 구조화 조문단위 배열이 있으면 키워드 필터링, 없으면 조문내용 전문 사용
   var articles = (law['조문'] && law['조문']['조문단위'])
                || (law['행정규칙조문'] && law['행정규칙조문']['조문단위'])
                || law['조문단위'];
+
+  // 조문내용이 객체/배열일 수 있으므로 문자열 변환 헬퍼
+  function toText(v) {
+    if (!v) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) return v.map(toText).join(' ');
+    if (typeof v === 'object') return Object.values(v).map(toText).join(' ');
+    return String(v);
+  }
+  function stripHtml(s) { return s.replace(/<[^>]+>/g, ' ').replace(/&[a-z#0-9]+;/gi, ' ').replace(/\s+/g, ' ').trim(); }
 
   var text;
   if (articles) {
     if (!Array.isArray(articles)) articles = [articles];
     var adKeywords = ['표시', '광고', '금지', '위반', '과장', '허위', '오인', '거짓', '부당'];
     var relevant = articles.filter(function(art) {
-      var h = (art['조제목'] || '') + (art['조문내용'] || '');
+      var h = toText(art['조제목']) + toText(art['조문내용']);
       return adKeywords.some(function(kw) { return h.includes(kw); });
     });
     var targetArts = relevant.length > 0 ? relevant : articles.slice(0, 15);
     text = header;
     targetArts.forEach(function(art) {
       var num = art['조번호'] || '';
-      var title = art['조제목'] ? ' (' + art['조제목'] + ')' : '';
-      var content = (art['조문내용'] || '').trim();
+      var title = art['조제목'] ? ' (' + toText(art['조제목']) + ')' : '';
+      var content = stripHtml(toText(art['조문내용']));
       if (content) text += '제' + num + '조' + title + '\n' + content + '\n\n';
     });
   } else {
-    // 행정규칙 전문이 문자열로 반환되는 경우 (HTML 태그 제거 후 사용)
-    var fullText = (law['조문내용'] || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    var fullText = stripHtml(toText(law['조문내용']));
     if (!fullText) return { name: lawName, date: enfDate, text: '' };
     if (fullText.length > 8000) fullText = fullText.slice(0, 8000) + '...';
     text = header + fullText;

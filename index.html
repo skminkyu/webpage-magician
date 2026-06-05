@@ -308,36 +308,47 @@ async function fetchLawFromApi(query, target) {
   var searchRes = await fetch(searchUrl);
   if (!searchRes.ok) throw new Error('search HTTP ' + searchRes.status);
   var searchData = await searchRes.json();
-  console.log('[LawAPI] search result for "' + query + '":', JSON.stringify(searchData).slice(0, 500));
 
-  // law.go.kr 응답 구조: 검색 유형에 따라 배열 키가 다를 수 있음
-  var searchRoot = searchData.LawSearch || searchData;
-  // 법령수가 0이면 결과 없음
-  var totalCount = parseInt(searchRoot['@전체건수'] || searchRoot['전체건수'] || '0', 10);
-  var laws = searchRoot.law || searchRoot['행정규칙'];
-  if (!laws && totalCount === 0) throw new Error('검색 결과 없음 (0건): ' + query);
-  if (!laws) throw new Error('검색 결과 파싱 실패 (키 없음): ' + JSON.stringify(Object.keys(searchRoot)));
-  if (!Array.isArray(laws)) laws = [laws];
-  if (laws.length === 0) throw new Error('검색 결과 없음: ' + query);
+  var isAdmrul = target === 'admrul';
+  // admrul → AdmRulSearch / law → LawSearch
+  var searchRoot = isAdmrul ? searchData.AdmRulSearch : searchData.LawSearch;
+  if (!searchRoot) throw new Error('응답 루트 없음. 키: ' + JSON.stringify(Object.keys(searchData)));
+
+  // admrul → items 키 'admrul' / law → 'law'
+  var items = isAdmrul ? searchRoot.admrul : searchRoot.law;
+  if (!items) throw new Error('항목 없음 (totalCnt=' + (searchRoot.totalCnt || '?') + ')');
+  if (!Array.isArray(items)) items = [items];
+  if (items.length === 0) throw new Error('검색 결과 0건: ' + query);
 
   var queryFirst = query.split(' ')[0];
-  function getLawName(l) { return l['법령명'] || l['행정규칙명'] || ''; }
-  var match = laws.find(function(l) { return getLawName(l).includes(queryFirst); }) || laws[0];
-  var mst = match['MST'];
-  if (!mst) throw new Error('MST 없음. 항목 키: ' + JSON.stringify(Object.keys(match)));
+  function getName(item) {
+    // admrul 아이템은 자기 자신의 이름 필드가 'admrul', law는 '법령명한글'
+    return item['admrul'] || item['법령명한글'] || item['법령명'] || '';
+  }
+  var match = items.find(function(i) { return getName(i).includes(queryFirst); }) || items[0];
 
-  // lawService.do 로 조문 조회 (고시도 동일)
-  var contentUrl = '/law-api?service=lawService&MST=' + mst;
+  var contentUrl;
+  if (isAdmrul) {
+    // admrul 조문 조회: ID=행정규칙일련번호, target=admrul
+    var admrulId = match['행정규칙일련번호'];
+    if (!admrulId) throw new Error('행정규칙일련번호 없음. 키: ' + JSON.stringify(Object.keys(match)));
+    contentUrl = '/law-api?service=lawService&target=admrul&ID=' + admrulId;
+  } else {
+    // law 조문 조회: MST=법령일련번호
+    var mst = match['법령일련번호'];
+    if (!mst) throw new Error('법령일련번호 없음. 키: ' + JSON.stringify(Object.keys(match)));
+    contentUrl = '/law-api?service=lawService&MST=' + mst;
+  }
+
   var contentRes = await fetch(contentUrl);
   if (!contentRes.ok) throw new Error('content HTTP ' + contentRes.status);
   var contentData = await contentRes.json();
-  console.log('[LawAPI] content result for MST=' + mst + ':', JSON.stringify(contentData).slice(0, 500));
 
   var law = contentData['법령'] || contentData['행정규칙'];
-  if (!law) throw new Error('조문 데이터 없음. 루트 키: ' + JSON.stringify(Object.keys(contentData)));
+  if (!law) throw new Error('조문 루트 없음. 키: ' + JSON.stringify(Object.keys(contentData)));
 
   var info = law['기본정보'] || {};
-  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getLawName(match) || query;
+  var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || getName(match) || query;
   var enfDate = info['시행일자'] || info['발령일자'] || '';
 
   var articles = law['조문'] && law['조문']['조문단위'];

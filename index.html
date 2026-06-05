@@ -352,26 +352,36 @@ async function fetchLawFromApi(query, target) {
   var lawName = info['법령명_한글'] || info['법령명한글'] || info['행정규칙명'] || info['제목'] || getName(match) || query;
   var enfDate = info['시행일자'] || info['발령일자'] || '';
 
+  var header = '[' + lawName + (enfDate ? ' · 시행 ' + enfDate + ']' : ']') + '\n\n';
+
+  // 구조화 조문(조문단위 배열)이 있으면 키워드 필터링, 없으면 조문내용 전문 사용
   var articles = (law['조문'] && law['조문']['조문단위'])
                || (law['행정규칙조문'] && law['행정규칙조문']['조문단위'])
                || law['조문단위'];
-  if (!articles) return { name: lawName, date: enfDate, text: '' };
-  if (!Array.isArray(articles)) articles = [articles];
 
-  var adKeywords = ['표시', '광고', '금지', '위반', '과장', '허위', '오인', '거짓', '부당'];
-  var relevant = articles.filter(function(art) {
-    var haystack = (art['조제목'] || '') + (art['조문내용'] || '');
-    return adKeywords.some(function(kw) { return haystack.includes(kw); });
-  });
-  var targetArts = relevant.length > 0 ? relevant : articles.slice(0, 15);
-
-  var text = '[' + lawName + (enfDate ? ' · 시행 ' + enfDate + ']' : ']') + '\n\n';
-  targetArts.forEach(function(art) {
-    var num = art['조번호'] || '';
-    var title = art['조제목'] ? ' (' + art['조제목'] + ')' : '';
-    var content = (art['조문내용'] || '').trim();
-    if (content) text += '제' + num + '조' + title + '\n' + content + '\n\n';
-  });
+  var text;
+  if (articles) {
+    if (!Array.isArray(articles)) articles = [articles];
+    var adKeywords = ['표시', '광고', '금지', '위반', '과장', '허위', '오인', '거짓', '부당'];
+    var relevant = articles.filter(function(art) {
+      var h = (art['조제목'] || '') + (art['조문내용'] || '');
+      return adKeywords.some(function(kw) { return h.includes(kw); });
+    });
+    var targetArts = relevant.length > 0 ? relevant : articles.slice(0, 15);
+    text = header;
+    targetArts.forEach(function(art) {
+      var num = art['조번호'] || '';
+      var title = art['조제목'] ? ' (' + art['조제목'] + ')' : '';
+      var content = (art['조문내용'] || '').trim();
+      if (content) text += '제' + num + '조' + title + '\n' + content + '\n\n';
+    });
+  } else {
+    // 행정규칙 전문이 문자열로 반환되는 경우 (HTML 태그 제거 후 사용)
+    var fullText = (law['조문내용'] || '').replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!fullText) return { name: lawName, date: enfDate, text: '' };
+    if (fullText.length > 8000) fullText = fullText.slice(0, 8000) + '...';
+    text = header + fullText;
+  }
 
   return { name: lawName, date: enfDate, text: text.trim() };
 }
@@ -384,11 +394,17 @@ async function loadLawsFromApi() {
   }
 
   try {
-    var [envResult, chemRegResult, chemLawResult] = await Promise.allSettled([
-      fetchLawFromApi('환경성 표시광고 관리제도에 관한 고시', 'admrul'),
-      fetchLawFromApi('생활화학제품 등의 표시광고에 관한 규정', 'admrul'),
-      fetchLawFromApi('생활화학제품 및 살생물제의 안전관리에 관한 법률', 'law')
-    ]);
+    // law.go.kr 레이트 리밋 방지: 순차 요청 (500ms 간격)
+    function delay(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+    async function fetchSafe(q, t) {
+      try { return { status: 'fulfilled', value: await fetchLawFromApi(q, t) }; }
+      catch(e) { return { status: 'rejected', reason: e }; }
+    }
+    var envResult    = await fetchSafe('환경성 표시광고 관리제도에 관한 고시', 'admrul');
+    await delay(600);
+    var chemRegResult = await fetchSafe('생활화학제품 등의 표시광고에 관한 규정', 'admrul');
+    await delay(600);
+    var chemLawResult = await fetchSafe('생활화학제품 및 살생물제의 안전관리에 관한 법률', 'law');
 
     var loaded = [];
 

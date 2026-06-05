@@ -151,7 +151,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 이미지 URL 프록시
+  // 이미지 URL 프록시 (리다이렉트 최대 5회 추적)
   if (parsed.pathname === '/fetch-image' && req.method === 'GET') {
     const imgUrl = parsed.query.url;
     if (!imgUrl) {
@@ -159,31 +159,44 @@ const server = http.createServer((req, res) => {
       res.end(JSON.stringify({ error: 'url 파라미터가 필요합니다.' }));
       return;
     }
-    let parsedUrl;
-    try { parsedUrl = new URL(imgUrl); } catch(e) {
-      res.writeHead(400, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: '유효하지 않은 URL입니다.' }));
-      return;
-    }
-    const protocol = parsedUrl.protocol === 'https:' ? https : require('http');
-    const imgReq = protocol.request({
-      hostname: parsedUrl.hostname,
-      path: parsedUrl.pathname + parsedUrl.search,
-      method: 'GET',
-      headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': parsedUrl.origin },
-    }, imgRes => {
-      const ct = imgRes.headers['content-type'] || 'image/jpeg';
-      res.writeHead(imgRes.statusCode, {
-        'Content-Type': ct,
-        'Cache-Control': 'public, max-age=86400',
+    function fetchImage(targetUrl, redirectsLeft) {
+      let pu;
+      try { pu = new URL(targetUrl); } catch(e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: '유효하지 않은 URL: ' + targetUrl }));
+        return;
+      }
+      const proto = pu.protocol === 'https:' ? https : http;
+      const imgReq = proto.request({
+        hostname: pu.hostname,
+        path: pu.pathname + pu.search,
+        method: 'GET',
+        headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': pu.origin },
+        rejectUnauthorized: false,
+      }, imgRes => {
+        if ([301, 302, 307, 308].includes(imgRes.statusCode) && imgRes.headers.location) {
+          imgRes.resume();
+          if (redirectsLeft <= 0) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '리다이렉트 횟수 초과' }));
+            return;
+          }
+          const loc = imgRes.headers.location;
+          const next = loc.startsWith('http') ? loc : new URL(loc, targetUrl).href;
+          fetchImage(next, redirectsLeft - 1);
+          return;
+        }
+        const ct = imgRes.headers['content-type'] || 'image/jpeg';
+        res.writeHead(imgRes.statusCode, { 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400' });
+        imgRes.pipe(res);
       });
-      imgRes.pipe(res);
-    });
-    imgReq.on('error', e => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    });
-    imgReq.end();
+      imgReq.on('error', e => {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      });
+      imgReq.end();
+    }
+    fetchImage(imgUrl, 5);
     return;
   }
 

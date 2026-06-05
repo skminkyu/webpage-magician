@@ -150,6 +150,7 @@ const server = http.createServer((req, res) => {
     lawReq.end();
     return;
   }
+
   // 이미지 URL 프록시
   if (parsed.pathname === '/fetch-image' && req.method === 'GET') {
     const imgUrl = parsed.query.url;
@@ -185,6 +186,7 @@ const server = http.createServer((req, res) => {
     imgReq.end();
     return;
   }
+
   // 정적 파일 서빙
   let filePath = parsed.pathname === '/' ? '/index.html' : parsed.pathname;
   filePath = path.join(__dirname, decodeURIComponent(filePath));

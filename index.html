@@ -159,6 +159,47 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .law-api-badge .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
 .hidden { display: none !important; }
 
+/* ─── 모드 탭 ─────────────────────────────────────────── */
+.mode-tabs { display: flex; gap: 4px; background: var(--bg3); border-radius: 7px; padding: 3px; }
+.mode-tab { padding: 4px 14px; border-radius: 5px; border: none; background: none; color: var(--text2); font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.mode-tab.active { background: var(--accent); color: #fff; }
+
+/* ─── 버전 비교 뷰 ─────────────────────────────────────── */
+.compare-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.compare-upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px; flex-shrink: 0; }
+.compare-slot { display: flex; flex-direction: column; gap: 8px; }
+.compare-slot-label { font-size: 12px; font-weight: 600; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+.compare-slot-label .ver-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+.ver-badge.v1 { background: rgba(91,138,245,0.15); color: var(--accent); border: 1px solid rgba(91,138,245,0.3); }
+.ver-badge.v2 { background: rgba(52,211,153,0.12); color: var(--green); border: 1px solid rgba(52,211,153,0.3); }
+.compare-drop { border: 2px dashed var(--border); border-radius: 8px; padding: 20px 10px; text-align: center; cursor: pointer; transition: all .15s; color: var(--text3); font-size: 12px; position: relative; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.compare-drop:hover, .compare-drop.drag-over { border-color: var(--accent); color: var(--text2); }
+.compare-drop input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+.compare-drop .drop-icon { font-size: 22px; }
+.compare-preview-wrap { border-radius: 8px; overflow: hidden; border: 1px solid var(--border); max-height: 160px; }
+.compare-preview-wrap img { width: 100%; display: block; object-fit: cover; max-height: 160px; }
+.compare-actions { display: flex; align-items: center; gap: 12px; padding: 0 16px 12px; flex-shrink: 0; }
+.compare-result { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+.diff-summary-box { background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: var(--text); line-height: 1.6; }
+.diff-stats { display: flex; gap: 10px; margin-bottom: 10px; }
+.diff-stat { padding: 4px 12px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.diff-stat.added { background: rgba(52,211,153,0.15); color: var(--green); }
+.diff-stat.removed { background: rgba(240,82,82,0.15); color: var(--red); }
+.diff-stat.changed { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.diff-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.diff-item-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg3); font-size: 12px; }
+.diff-type-badge { padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+.diff-type-badge.추가 { background: rgba(52,211,153,0.15); color: var(--green); }
+.diff-type-badge.삭제 { background: rgba(240,82,82,0.15); color: var(--red); }
+.diff-type-badge.변경 { background: rgba(251,191,36,0.15); color: var(--yellow); }
+.diff-item-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+.diff-text-row { display: flex; gap: 8px; align-items: flex-start; }
+.diff-text-label { font-size: 10px; color: var(--text3); width: 28px; flex-shrink: 0; padding-top: 2px; }
+.diff-text-val { flex: 1; background: var(--bg); border-radius: 5px; padding: 5px 8px; color: var(--text2); line-height: 1.5; }
+.diff-text-val.old { border-left: 3px solid var(--red); }
+.diff-text-val.new { border-left: 3px solid var(--green); }
+.diff-note { font-size: 11px; color: var(--text3); padding: 4px 0 0; }
+
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -172,6 +213,10 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 
 <div class="header">
   <div class="header-title">상세페이지 <span>광고 검수</span> 시스템</div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" id="tabInspect" onclick="switchMode('inspect')">광고 검수</button>
+    <button class="mode-tab" id="tabCompare" onclick="switchMode('compare')">버전 비교</button>
+  </div>
   <div class="header-spacer"></div>
   <div class="key-status">
     <div class="key-dot" id="keyDot"></div>
@@ -266,6 +311,46 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
         <div class="empty-sub">카테고리 선택 후 이미지를 업로드하고 검수를 시작하세요</div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 버전 비교 뷰 -->
+<div id="compareView" class="hidden" style="height:calc(100vh - 52px - 52px); display:flex; flex-direction:column; overflow:hidden;">
+  <div class="compare-view">
+    <div class="compare-upload-row">
+      <div class="compare-slot">
+        <div class="compare-slot-label">
+          <span class="ver-badge v1">버전 1</span> 기존 상세페이지
+        </div>
+        <div class="compare-drop" id="compareDrop1">
+          <input type="file" accept="image/*" id="compareFile1">
+          <div class="drop-icon">📄</div>
+          <div>클릭 또는 드래그</div>
+        </div>
+        <div id="comparePreview1"></div>
+      </div>
+      <div class="compare-slot">
+        <div class="compare-slot-label">
+          <span class="ver-badge v2">버전 2</span> 신규 상세페이지
+        </div>
+        <div class="compare-drop" id="compareDrop2">
+          <input type="file" accept="image/*" id="compareFile2">
+          <div class="drop-icon">📄</div>
+          <div>클릭 또는 드래그</div>
+        </div>
+        <div id="comparePreview2"></div>
+      </div>
+    </div>
+    <div class="compare-actions">
+      <button class="btn-primary" id="btnCompare" disabled onclick="startComparison()">
+        <span>🔍</span> 비교 시작
+      </button>
+      <div class="status-text" id="compareStatus">버전 1과 버전 2 이미지를 각각 업로드하세요</div>
+      <div class="progress-bar-wrap" style="flex:1;">
+        <div class="progress-bar" id="compareProgress"></div>
+      </div>
+    </div>
+    <div class="compare-result" id="compareResult"></div>
   </div>
 </div>
 
@@ -994,6 +1079,175 @@ function updateButtons() {
 function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── MODE SWITCHING ───────────────────────────────────────────────────────────
+
+function switchMode(mode) {
+  document.getElementById('tabInspect').classList.toggle('active', mode === 'inspect');
+  document.getElementById('tabCompare').classList.toggle('active', mode === 'compare');
+  var main = document.querySelector('.main');
+  var bottomBar = document.querySelector('.bottom-bar');
+  var compareView = document.getElementById('compareView');
+  if (mode === 'compare') {
+    main.style.display = 'none';
+    bottomBar.style.display = 'none';
+    compareView.style.display = 'flex';
+    compareView.classList.remove('hidden');
+  } else {
+    main.style.display = '';
+    bottomBar.style.display = '';
+    compareView.style.display = 'none';
+    compareView.classList.add('hidden');
+  }
+}
+
+// ─── VERSION COMPARE ─────────────────────────────────────────────────────────
+
+var compareSlots = { 1: null, 2: null };
+var isComparing = false;
+
+(function initCompare() {
+  [1, 2].forEach(function(n) {
+    var input = document.getElementById('compareFile' + n);
+    var drop = document.getElementById('compareDrop' + n);
+    input.addEventListener('change', function() {
+      if (this.files[0]) setCompareFile(n, this.files[0]);
+      this.value = '';
+    });
+    drop.addEventListener('dragover', function(e) { e.preventDefault(); drop.classList.add('drag-over'); });
+    drop.addEventListener('dragleave', function() { drop.classList.remove('drag-over'); });
+    drop.addEventListener('drop', function(e) {
+      e.preventDefault(); drop.classList.remove('drag-over');
+      var f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith('image/')) setCompareFile(n, f);
+    });
+  });
+})();
+
+function setCompareFile(n, file) {
+  var objectUrl = URL.createObjectURL(file);
+  if (compareSlots[n] && compareSlots[n].objectUrl) URL.revokeObjectURL(compareSlots[n].objectUrl);
+  compareSlots[n] = { file: file, objectUrl: objectUrl, name: file.name };
+  var preview = document.getElementById('comparePreview' + n);
+  preview.innerHTML = '<div class="compare-preview-wrap"><img src="' + objectUrl + '" alt="ver' + n + '"></div>';
+  var label = n === 1 ? '기존 버전' : '신규 버전';
+  document.getElementById('compareDrop' + n).querySelector('div:not(.drop-icon)').textContent = file.name.length > 30 ? file.name.slice(0,30)+'…' : file.name;
+  updateCompareButton();
+}
+
+function updateCompareButton() {
+  document.getElementById('btnCompare').disabled = !(compareSlots[1] && compareSlots[2]) || isComparing;
+}
+
+function setCompareStatus(msg, progress) {
+  document.getElementById('compareStatus').textContent = msg;
+  if (progress !== undefined) {
+    document.getElementById('compareProgress').style.width = progress + '%';
+    document.getElementById('compareProgress').style.transition = 'width 0.4s';
+  }
+}
+
+async function startComparison() {
+  if (!compareSlots[1] || !compareSlots[2] || isComparing) return;
+  isComparing = true;
+  updateCompareButton();
+  document.getElementById('compareResult').innerHTML = '';
+  document.getElementById('compareProgress').style.width = '0%';
+
+  try {
+    setCompareStatus('버전 1 OCR 중...', 10);
+    var ocr1 = await ocrFileForCompare(compareSlots[1].file);
+    setCompareStatus('버전 2 OCR 중...', 40);
+    var ocr2 = await ocrFileForCompare(compareSlots[2].file);
+    setCompareStatus('변경 내용 분석 중...', 70);
+
+    var prompt = '당신은 상세페이지 문구 변경 감지 전문 시스템입니다.\n\n두 버전의 상세페이지 OCR 텍스트를 비교하여 달라진 내용을 모두 찾아주세요.\n\n[버전 1 - 기존]\n' + ocr1 + '\n\n[버전 2 - 신규]\n' + ocr2 + '\n\n비교 기준:\n- 문구가 추가되었거나 삭제된 경우\n- 기존 문구가 다른 표현으로 변경된 경우\n- 수치, 용량, 가격, 기간 등 중요 정보 변경\n- 순서나 구성이 달라진 경우\n\n반드시 아래 JSON 형식으로만 답변하세요. 다른 설명 없이 JSON만:\n{\n  "changes": [\n    {\n      "type": "추가|삭제|변경",\n      "v1_text": "기존 버전 문구 (추가인 경우 null)",\n      "v2_text": "신규 버전 문구 (삭제인 경우 null)",\n      "note": "변경 내용 설명 (1문장)"\n    }\n  ],\n  "total_changes": 변경_항목_수,\n  "has_significant_change": true또는false,\n  "summary": "전체 변경 요약 (2-3문장)"\n}\n변경 없으면 changes를 빈 배열로 반환하세요.';
+
+    var resp = await callClaude({ model: 'claude-opus-4-8', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] });
+    var raw = resp.content[0].text;
+    var jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('응답 파싱 실패');
+    var result = JSON.parse(jsonMatch[0]);
+
+    setCompareStatus('완료! 변경 ' + result.total_changes + '건 발견', 100);
+    renderCompareResult(result);
+  } catch(e) {
+    setCompareStatus('오류: ' + e.message, 0);
+  } finally {
+    isComparing = false;
+    updateCompareButton();
+  }
+}
+
+async function ocrFileForCompare(file) {
+  var img = await loadImageBitmap(file);
+  var tileH = 2000, overlap = 150;
+  var totalH = img.height, w = img.width;
+  var tiles = [];
+  for (var y = 0; y < totalH; y += tileH - overlap) {
+    var h = Math.min(tileH, totalH - y);
+    if (h < 100) break;
+    tiles.push({ y: y, h: h });
+    if (y + h >= totalH) break;
+  }
+  var parts = [];
+  for (var i = 0; i < tiles.length; i++) {
+    var t = tiles[i];
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = t.h;
+    canvas.getContext('2d').drawImage(img, 0, t.y, w, t.h, 0, 0, w, t.h);
+    var b64 = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    var ocrResp = await callClaude({ model: 'claude-opus-4-8', max_tokens: 2048, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } }, { type: 'text', text: '이 이미지에서 보이는 텍스트를 모두 그대로 추출해주세요. 형식이나 설명 없이 텍스트만 줄바꿈으로 구분해서 출력하세요.' }] }] });
+    var part = ocrResp.content && ocrResp.content[0] ? ocrResp.content[0].text : '';
+    if (part.trim()) parts.push(part.trim());
+  }
+  return parts.join('\n');
+}
+
+function loadImageBitmap(file) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    var url = URL.createObjectURL(file);
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      resolve(canvas);
+    };
+    img.onerror = function() { URL.revokeObjectURL(url); reject(new Error('이미지 로드 실패')); };
+    img.src = url;
+  });
+}
+
+function renderCompareResult(result) {
+  var el = document.getElementById('compareResult');
+  var changes = result.changes || [];
+  var added = changes.filter(function(c) { return c.type === '추가'; }).length;
+  var removed = changes.filter(function(c) { return c.type === '삭제'; }).length;
+  var changed = changes.filter(function(c) { return c.type === '변경'; }).length;
+
+  var html = '<div class="diff-summary-box">';
+  html += '<div class="diff-stats">';
+  if (added)   html += '<span class="diff-stat added">+ 추가 ' + added + '건</span>';
+  if (removed) html += '<span class="diff-stat removed">− 삭제 ' + removed + '건</span>';
+  if (changed) html += '<span class="diff-stat changed">± 변경 ' + changed + '건</span>';
+  if (!changes.length) html += '<span class="diff-stat" style="background:var(--green-bg);color:var(--green)">✓ 변경 없음</span>';
+  html += '</div>';
+  html += '<div>' + escHtml(result.summary || '') + '</div>';
+  html += '</div>';
+
+  changes.forEach(function(c) {
+    html += '<div class="diff-item">';
+    html += '<div class="diff-item-header"><span class="diff-type-badge ' + escHtml(c.type) + '">' + escHtml(c.type) + '</span><span style="color:var(--text3);font-size:11px;">' + escHtml(c.note || '') + '</span></div>';
+    html += '<div class="diff-item-body">';
+    if (c.v1_text) html += '<div class="diff-text-row"><span class="diff-text-label">기존</span><div class="diff-text-val old">' + escHtml(c.v1_text) + '</div></div>';
+    if (c.v2_text) html += '<div class="diff-text-row"><span class="diff-text-label">신규</span><div class="diff-text-val new">' + escHtml(c.v2_text) + '</div></div>';
+    html += '</div></div>';
+  });
+
+  el.innerHTML = html;
 }
 </script>
 </body>

@@ -590,12 +590,11 @@ async function addImageUrl() {
   if (!raw) return;
   document.getElementById('urlInput').value = '';
 
-  // CDN 변환 파라미터 자동 제거
-  // 원본 URL 추출 대신 CDN 프록시 URL 유지 + /hdims/... suffix만 제거
-  // (원본 서버가 외부 접근 차단할 수 있으므로 CDN을 통해 접근)
-  raw = raw.replace(/\/hdims\/.*$/, '')
-           .replace(/\/format\/[^/?#]*$/, '')
-           .replace(/\/optimize[^/?#]*$/, '');
+  // CDN 변환 파라미터 정리
+  // crop 제거, avif→jpg 변환, optimize 제거 (CDN 프록시 URL 유지)
+  raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')  // crop 파라미터 제거
+           .replace(/\/format\/avif/, '/format/jpg')    // avif → jpg
+           .replace(/\/optimize\/?$/, '');              // optimize 제거
 
   var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
   var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
@@ -606,7 +605,7 @@ async function addImageUrl() {
     var resp = await fetch(proxyUrl);
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     var blob = await resp.blob();
-    if (!blob.type.startsWith('image/')) throw new Error('이미지가 아닌 응답: ' + blob.type);
+    if (!blob.type.startsWith('image/') && blob.type !== 'application/octet-stream') throw new Error('이미지가 아닌 응답: ' + blob.type);
     var file = new File([blob], name, { type: blob.type });
     handleFiles([file]);
     setStatus('URL 이미지 추가됨: ' + name);

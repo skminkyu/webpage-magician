@@ -591,16 +591,11 @@ async function addImageUrl() {
   document.getElementById('urlInput').value = '';
 
   // CDN 변환 파라미터 자동 제거
-  // 1) /proxy/src/{원본URL}/... 패턴에서 원본 URL 추출
-  var proxyMatch = raw.match(/\/proxy\/src\/(https?:\/\/.+?)(?:\/hdims\/|\/format\/|\/optimize|$)/);
-  if (proxyMatch) {
-    raw = proxyMatch[1];
-  } else {
-    // 2) /hdims/, /format/, /optimize 등 CDN 변환 suffix 제거
-    raw = raw.replace(/\/hdims\/.*$/, '')
-             .replace(/\/format\/[^?#]*/, '')
-             .replace(/\/optimize[^?#]*/, '');
-  }
+  // 원본 URL 추출 대신 CDN 프록시 URL 유지 + /hdims/... suffix만 제거
+  // (원본 서버가 외부 접근 차단할 수 있으므로 CDN을 통해 접근)
+  raw = raw.replace(/\/hdims\/.*$/, '')
+           .replace(/\/format\/[^/?#]*$/, '')
+           .replace(/\/optimize[^/?#]*$/, '');
 
   var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
   var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';

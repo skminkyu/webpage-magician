@@ -3,6 +3,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const KEY_FILE = path.join(__dirname, 'apikey.txt');
@@ -15,14 +16,22 @@ const MIME = {
   '.png':  'image/png',
 };
 
-// API 키 해석: 환경변수 우선, 없으면 apikey.txt 파일
+// Share store: id -> { imageDataUrl, annotations, createdAt }
+const shareStore = new Map();
+
+setInterval(() => {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  for (const [id, entry] of shareStore.entries()) {
+    if (entry.createdAt < cutoff) shareStore.delete(id);
+  }
+}, 60 * 60 * 1000);
+
 function getApiKey() {
   if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY.replace(/[^a-zA-Z0-9\-_]/g, '');
   if (fs.existsSync(KEY_FILE)) return fs.readFileSync(KEY_FILE, 'utf8').replace(/[^a-zA-Z0-9\-_]/g, '');
   return null;
 }
 
-// Anthropic API 호출 (직접 연결)
 function callAnthropic(apiKey, payload, callback) {
   const options = {
     hostname: 'api.anthropic.com',
@@ -45,7 +54,13 @@ function callAnthropic(apiKey, payload, callback) {
   apiReq.end();
 }
 
-// ─── HTTP 서버 ────────────────────────────────────────────
+function collectBody(req, cb) {
+  const chunks = [];
+  req.on('data', d => chunks.push(d));
+  req.on('end', () => cb(null, Buffer.concat(chunks).toString('utf8')));
+  req.on('error', e => cb(e));
+}
+
 const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -54,7 +69,6 @@ const server = http.createServer((req, res) => {
 
   const parsed = url.parse(req.url, true);
 
-  // API 키 저장 (로컬 개발용)
   if (parsed.pathname === '/save-key' && req.method === 'POST') {
     let body = '';
     req.on('data', d => body += d);
@@ -71,7 +85,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // API 키 상태 확인
   if (parsed.pathname === '/check-key' && req.method === 'GET') {
     const key = getApiKey();
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -82,7 +95,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Anthropic API 프록시
   if (parsed.pathname === '/api' && req.method === 'POST') {
     const apiKey = getApiKey();
     if (!apiKey) {
@@ -107,7 +119,59 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 법령 API 프록시 (law.go.kr)
+  // 주석 공유 저장
+  if (parsed.pathname === '/api/share' && req.method === 'POST') {
+    collectBody(req, (err, body) => {
+      if (err) {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: err.message }));
+        return;
+      }
+      try {
+        const { imageDataUrl, annotations } = JSON.parse(body);
+        if (!imageDataUrl || !Array.isArray(annotations)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: '잘못된 요청입니다.' }));
+          return;
+        }
+        const id = crypto.randomUUID();
+        shareStore.set(id, { imageDataUrl, annotations, createdAt: Date.now() });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ id, url: '/view/' + id }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: e.message }));
+      }
+    });
+    return;
+  }
+
+  // 주석 공유 조회
+  if (parsed.pathname.startsWith('/api/view/') && req.method === 'GET') {
+    const id = parsed.pathname.slice('/api/view/'.length);
+    const entry = shareStore.get(id);
+    if (!entry) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: '링크가 만료되었거나 존재하지 않습니다.' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ imageDataUrl: entry.imageDataUrl, annotations: entry.annotations }));
+    return;
+  }
+
+  // 주석 뷰어 페이지
+  if (parsed.pathname.startsWith('/view/') && req.method === 'GET') {
+    const viewerPath = path.join(__dirname, 'viewer.html');
+    if (fs.existsSync(viewerPath)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      fs.createReadStream(viewerPath).pipe(res);
+    } else {
+      res.writeHead(404); res.end('viewer.html not found');
+    }
+    return;
+  }
+
   if (parsed.pathname === '/law-api' && req.method === 'GET') {
     const queryParams = Object.assign({}, parsed.query);
     const service = queryParams.service;
@@ -151,7 +215,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 이미지 URL 프록시 (리다이렉트 최대 5회 추적)
   if (parsed.pathname === '/fetch-image' && req.method === 'GET') {
     const imgUrl = parsed.query.url;
     if (!imgUrl) {
@@ -200,7 +263,6 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // 정적 파일 서빙
   let filePath = parsed.pathname === '/' ? '/index.html' : parsed.pathname;
   filePath = path.join(__dirname, decodeURIComponent(filePath));
   const ext = path.extname(filePath);

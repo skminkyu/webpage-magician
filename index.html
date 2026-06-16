@@ -58,6 +58,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .file-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; border: 1px solid transparent; cursor: pointer; margin-bottom: 4px; transition: all .15s; }
 .file-item:hover { background: var(--bg3); border-color: var(--border); }
 .file-item.active { background: rgba(91,138,245,0.08); border-color: var(--accent); }
+.file-item.selected { background: rgba(91,138,245,0.05); border-color: rgba(91,138,245,0.5); }
 .file-thumb { width: 36px; height: 36px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); flex-shrink: 0; }
 .file-info { flex: 1; min-width: 0; }
 .file-name { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -446,7 +447,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 
 <div class="bottom-bar">
   <button class="btn-primary" id="btnStart" disabled>
-    <span>🔍</span> 검수 시작
+    <span>🔍</span> <span id="btnStartLabel">검수 시작</span>
   </button>
   <button class="btn-secondary" id="btnAll" disabled>전체 검수</button>
   <div class="status-text" id="statusText">카테고리를 선택하고 이미지를 업로드하세요</div>
@@ -641,6 +642,7 @@ var RULES_SUMMARY = {
 var currentCategory = localStorage.getItem('selectedCategory') || null;
 var files = [];
 var activeFileId = null;
+var selectedIds = new Set();
 var isRunning = false;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
@@ -794,7 +796,7 @@ function handleFiles(fileList) {
     var id = Date.now() + Math.random();
     var objectUrl = URL.createObjectURL(file);
     files.push({ id: id, name: file.name, file: file, objectUrl: objectUrl, status: 'pending', result: null, ocrText: null, error: null });
-    if (!activeFileId) activeFileId = id;
+    if (!activeFileId) { activeFileId = id; selectedIds.add(id); }
   });
   renderFileList();
   renderContent();
@@ -805,16 +807,31 @@ function removeFile(id) {
   var f = files.find(function(x) { return x.id === id; });
   if (f) URL.revokeObjectURL(f.objectUrl);
   files = files.filter(function(x) { return x.id !== id; });
+  selectedIds.delete(id);
   if (activeFileId === id) activeFileId = files.length ? files[0].id : null;
+  if (activeFileId && !selectedIds.has(activeFileId)) selectedIds.add(activeFileId);
   renderFileList();
   renderContent();
   updateButtons();
 }
 
-function selectFile(id) {
-  activeFileId = id;
+function selectFile(id, multi) {
+  if (multi) {
+    if (selectedIds.has(id)) {
+      selectedIds.delete(id);
+      if (activeFileId === id) activeFileId = selectedIds.size ? [...selectedIds].slice(-1)[0] : null;
+    } else {
+      selectedIds.add(id);
+      activeFileId = id;
+    }
+  } else {
+    selectedIds.clear();
+    selectedIds.add(id);
+    activeFileId = id;
+  }
   renderFileList();
   renderContent();
+  updateButtons();
 }
 
 function renderFileList() {
@@ -825,7 +842,9 @@ function renderFileList() {
     return;
   }
   list.innerHTML = files.map(function(f) {
-    return '<div class="file-item' + (f.id === activeFileId ? ' active' : '') + '" data-id="' + f.id + '">' +
+    var isActive = f.id === activeFileId;
+    var isSelected = selectedIds.has(f.id);
+    return '<div class="file-item' + (isActive ? ' active' : '') + (isSelected && !isActive ? ' selected' : '') + '" data-id="' + f.id + '">' +
       '<img class="file-thumb" src="' + f.objectUrl + '" alt="">' +
       '<div class="file-info">' +
         '<div class="file-name">' + escHtml(f.name) + '</div>' +
@@ -838,7 +857,7 @@ function renderFileList() {
   list.querySelectorAll('.file-item').forEach(function(el) {
     el.addEventListener('click', function(e) {
       if (e.target.dataset.remove) return;
-      selectFile(parseFloat(el.dataset.id));
+      selectFile(parseFloat(el.dataset.id), e.ctrlKey || e.metaKey || e.shiftKey);
     });
   });
   list.querySelectorAll('.file-remove').forEach(function(btn) {
@@ -971,14 +990,24 @@ function renderContent() {
 // ─── INSPECTION ───────────────────────────────────────────────────────────────
 
 async function startInspection() {
-  if (!activeFileId || isRunning) return;
-  var f = files.find(function(x) { return x.id === activeFileId; });
-  if (!f) return;
+  if (isRunning) return;
+  var targets = files.filter(function(f) { return selectedIds.has(f.id); });
+  if (!targets.length) return;
   isRunning = true;
   updateButtons();
-  await inspectFile(f);
+  for (var i = 0; i < targets.length; i++) {
+    var f = targets[i];
+    activeFileId = f.id;
+    renderFileList();
+    renderContent();
+    if (targets.length > 1) setStatus('검수 중 ' + (i+1) + '/' + targets.length + ': ' + f.name);
+    await inspectFile(f);
+  }
   isRunning = false;
+  if (targets.length > 1) setStatus('선택 검수 완료 (' + targets.length + '개)');
   updateButtons();
+  renderFileList();
+  renderContent();
 }
 
 async function inspectAll() {
@@ -1163,11 +1192,15 @@ function setProgress(pct) { document.getElementById('progressBar').style.width =
 function updateButtons() {
   var hasFiles = files.length > 0;
   var hasCat = !!currentCategory;
-  document.getElementById('btnStart').disabled = isRunning || !hasFiles || !hasCat || !activeFileId;
+  var selCount = selectedIds.size;
+  document.getElementById('btnStart').disabled = isRunning || !hasFiles || !hasCat || selCount === 0;
   document.getElementById('btnAll').disabled = isRunning || !hasFiles || !hasCat;
+  var label = selCount > 1 ? '선택 검수 (' + selCount + ')' : '검수 시작';
+  document.getElementById('btnStartLabel').textContent = label;
   if (!isRunning) {
     if (!hasCat) setStatus('카테고리를 선택하세요');
     else if (!hasFiles) setStatus('이미지를 업로드하세요');
+    else if (selCount > 1) setStatus(selCount + '개 선택됨. 검수를 시작하세요. (Ctrl+클릭으로 다중 선택)');
     else setStatus(files.length + '개 이미지 준비됨. 검수를 시작하세요.');
   }
 }

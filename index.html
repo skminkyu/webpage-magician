@@ -147,11 +147,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .modal-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 9px 12px; color: var(--text); font-size: 13px; font-family: monospace; outline: none; }
 .modal-input:focus { border-color: var(--accent); }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
-.url-input-row { display: flex; gap: 8px; margin-top: 10px; }
-.url-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; color: var(--text); font-size: 12px; outline: none; }
+.url-input-row { display: flex; gap: 8px; margin-top: 10px; align-items: flex-start; }
+.url-input { flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 7px 12px; color: var(--text); font-size: 12px; outline: none; resize: vertical; min-height: 32px; max-height: 120px; font-family: inherit; line-height: 1.5; }
 .url-input:focus { border-color: var(--accent); }
 .url-input::placeholder { color: var(--text3); }
-.btn-url-add { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: all .15s; }
+.btn-url-add { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; white-space: nowrap; transition: all .15s; flex-shrink: 0; }
 .btn-url-add:hover { border-color: var(--accent); color: var(--accent); }
 .law-api-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text3); margin-top: 8px; padding: 3px 8px; border-radius: 4px; background: var(--bg3); border: 1px solid var(--border); }
 .law-api-badge.loaded { color: var(--green); border-color: rgba(52,211,153,0.3); }
@@ -339,7 +339,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
         <div class="drop-sub">JPG, PNG, WebP, GIF 등 · 여러 파일 동시 업로드 가능</div>
       </div>
       <div class="url-input-row">
-        <input class="url-input" type="text" id="urlInput" placeholder="이미지 URL 붙여넣기 (https://...jpg)">
+        <textarea class="url-input" id="urlInput" placeholder="이미지 URL 붙여넣기 (여러 개는 줄바꿈으로 구분)" rows="1"></textarea>
         <button class="btn-url-add" id="btnUrlAdd">추가</button>
       </div>
     </div>
@@ -669,40 +669,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
   document.getElementById('btnUrlAdd').addEventListener('click', addImageUrl);
   document.getElementById('urlInput').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') addImageUrl();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addImageUrl(); }
   });
 });
 
 // ─── KEY MANAGEMENT ───────────────────────────────────────────────────────────
 
 async function addImageUrl() {
-  var raw = document.getElementById('urlInput').value.trim();
-  if (!raw) return;
+  var input = document.getElementById('urlInput').value.trim();
+  if (!input) return;
   document.getElementById('urlInput').value = '';
 
-  // CDN 변환 파라미터 정리
-  // crop 제거, avif→jpg 변환, optimize 제거 (CDN 프록시 URL 유지)
-  raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')
-           .replace(/\/format\/avif/, '/format/jpg')
-           .replace(/\/optimize\/?$/, '');
+  var urls = input.split(/\n+/).map(s => s.trim()).filter(Boolean);
+  if (urls.length === 0) return;
 
-  var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
-  var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
-  if (name.length > 60) name = name.slice(0, 60);
+  var loaded = 0, failed = [];
+  setStatus('이미지 URL 로딩 중... (0/' + urls.length + ')');
 
-  setStatus('이미지 URL 로딩 중...');
-  try {
-    var resp = await fetch(proxyUrl);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    var blob = await resp.blob();
-    if (!blob.type.startsWith('image/')) throw new Error('이미지가 아닌 응답: ' + blob.type);
-    var file = new File([blob], name, { type: blob.type });
-    handleFiles([file]);
-    setStatus('URL 이미지 추가됨: ' + name);
-  } catch(e) {
-    alert('이미지 로딩 실패: ' + e.message + '\n\n이미지 직접 주소(jpg/png/avif 등)인지 확인하세요.');
-    setStatus('URL 로딩 실패');
+  for (var i = 0; i < urls.length; i++) {
+    var raw = urls[i];
+    // CDN 변환 파라미터 정리: crop 제거, avif→jpg, optimize 제거
+    raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')
+             .replace(/\/format\/avif/, '/format/jpg')
+             .replace(/\/optimize\/?$/, '');
+
+    var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
+    var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
+    if (name.length > 60) name = name.slice(0, 60);
+
+    try {
+      var resp = await fetch(proxyUrl);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var blob = await resp.blob();
+      if (!blob.type.startsWith('image/') && blob.type !== 'application/octet-stream') throw new Error('이미지가 아닌 응답: ' + blob.type);
+      var file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+      handleFiles([file]);
+      loaded++;
+      setStatus('이미지 URL 로딩 중... (' + loaded + '/' + urls.length + ')');
+    } catch(e) {
+      failed.push((i + 1) + '번: ' + e.message);
+    }
   }
+
+  if (failed.length > 0) {
+    alert('일부 URL 로딩 실패:\n' + failed.join('\n') + '\n\n이미지 직접 주소(jpg/png/avif 등)인지 확인하세요.');
+  }
+  setStatus(loaded + '개 URL 이미지 추가됨' + (failed.length ? ' (' + failed.length + '개 실패)' : ''));
 }
 
 function openKeyModal() {

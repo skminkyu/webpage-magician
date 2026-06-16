@@ -203,6 +203,44 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ─── 주석 검토 뷰 ─────────────────────────────────────── */
+.annotate-view { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.annotate-toolbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 10px 16px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
+.annotate-toolbar-label { font-size: 12px; color: var(--text2); white-space: nowrap; }
+.color-picker-group { display: flex; gap: 6px; }
+.color-dot { width: 22px; height: 22px; border-radius: 50%; cursor: pointer; border: 2px solid transparent; transition: all .15s; flex-shrink: 0; }
+.color-dot.active { border-color: var(--text); box-shadow: 0 0 0 2px var(--bg2); }
+.annotate-sep { width: 1px; height: 24px; background: var(--border); }
+.annotate-upload-btn { background: var(--bg3); border: 1px solid var(--border); color: var(--text2); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all .15s; white-space: nowrap; }
+.annotate-upload-btn:hover { border-color: var(--accent); color: var(--accent); }
+.annotate-main { flex: 1; display: flex; overflow: hidden; }
+.annotate-canvas-area { flex: 1; overflow: auto; padding: 20px; background: var(--bg); display: flex; justify-content: center; align-items: flex-start; }
+.annotate-image-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 24px rgba(0,0,0,.4); border-radius: 4px; overflow: hidden; line-height: 0; }
+.annotate-image-wrapper.no-image { display: none; }
+#annotBgImage { display: block; max-width: 100%; user-select: none; pointer-events: none; }
+#annotDrawCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: crosshair; }
+.annotate-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text3); cursor: pointer; width: 400px; height: 280px; border: 2px dashed var(--border); border-radius: 12px; background: var(--bg2); transition: all .2s; position: relative; }
+.annotate-placeholder:hover { border-color: var(--accent); color: var(--text2); }
+.annotate-placeholder .ph-icon { font-size: 36px; }
+.annotate-placeholder .ph-text { font-size: 14px; }
+.annotate-sidebar { width: 300px; min-width: 260px; background: var(--bg2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+.annotate-sidebar-hdr { padding: 12px 14px; background: var(--bg3); border-bottom: 1px solid var(--border); font-size: 12px; font-weight: 700; color: var(--text2); display: flex; justify-content: space-between; align-items: center; }
+.annot-count { font-size: 11px; color: var(--text3); font-weight: 400; }
+.annot-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.annot-card { background: var(--bg3); border-radius: 8px; border-left: 4px solid var(--border); padding: 10px 12px; cursor: pointer; transition: all .15s; }
+.annot-card:hover, .annot-card.highlighted { background: rgba(91,138,245,0.08); }
+.annot-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.annot-card-num { width: 20px; height: 20px; border-radius: 50%; background: var(--bg); color: var(--text); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.annot-card-label { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+.annot-card-del { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 14px; opacity: 0; transition: opacity .15s; padding: 0 2px; }
+.annot-card:hover .annot-card-del { opacity: 1; }
+.annot-card-comment { font-size: 11px; color: var(--text2); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 6px 8px; min-height: 34px; outline: none; resize: none; width: 100%; font-family: inherit; line-height: 1.5; }
+.annot-card-comment:focus { border-color: var(--accent); }
+.annot-share-area { padding: 12px 14px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.annot-share-result { margin-top: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; display: none; }
+.annot-share-url { font-size: 11px; color: var(--accent); word-break: break-all; margin-bottom: 8px; font-family: monospace; }
+.annot-share-btns { display: flex; gap: 6px; }
 </style>
 </head>
 <body>
@@ -216,6 +254,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
   <div class="mode-tabs">
     <button class="mode-tab active" id="tabInspect" onclick="switchMode('inspect')">광고 검수</button>
     <button class="mode-tab" id="tabCompare" onclick="switchMode('compare')">버전 비교</button>
+    <button class="mode-tab" id="tabAnnotate" onclick="switchMode('annotate')">주석 검토</button>
   </div>
   <div class="header-spacer"></div>
   <div class="key-status">
@@ -351,6 +390,57 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
       </div>
     </div>
     <div class="compare-result" id="compareResult"></div>
+  </div>
+</div>
+
+<!-- 주석 검토 뷰 -->
+<div id="annotateView" class="hidden" style="height:calc(100vh - 52px);display:none;flex-direction:column;overflow:hidden;">
+  <div class="annotate-view">
+    <div class="annotate-toolbar">
+      <span class="annotate-toolbar-label">색상</span>
+      <div class="color-picker-group" id="annotColorPicker">
+        <div class="color-dot active" data-color="#e53e3e" style="background:#e53e3e" title="빨강"></div>
+        <div class="color-dot" data-color="#f6ad55" style="background:#f6ad55" title="주황"></div>
+        <div class="color-dot" data-color="#4299e1" style="background:#4299e1" title="파랑"></div>
+        <div class="color-dot" data-color="#48bb78" style="background:#48bb78" title="초록"></div>
+        <div class="color-dot" data-color="#a78bfa" style="background:#a78bfa" title="보라"></div>
+      </div>
+      <div class="annotate-sep"></div>
+      <button class="annotate-upload-btn" id="annotChangeBtn">🖼 이미지 변경</button>
+      <input type="file" id="annotFileInput" accept="image/*" style="display:none">
+      <div style="flex:1"></div>
+      <button class="btn-primary" id="annotShareBtn" style="font-size:12px;padding:6px 14px;" disabled>🔗 공유 링크 생성</button>
+    </div>
+    <div class="annotate-main">
+      <div class="annotate-canvas-area" id="annotCanvasArea">
+        <div class="annotate-placeholder" id="annotPlaceholder">
+          <div class="ph-icon">📁</div>
+          <div class="ph-text">클릭하여 이미지 업로드</div>
+          <input type="file" id="annotInitFileInput" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+        </div>
+        <div class="annotate-image-wrapper no-image" id="annotImageWrapper">
+          <img id="annotBgImage" alt="상세페이지" draggable="false" />
+          <canvas id="annotDrawCanvas"></canvas>
+        </div>
+      </div>
+      <div class="annotate-sidebar">
+        <div class="annotate-sidebar-hdr">
+          주석 목록
+          <span class="annot-count" id="annotCount">0개</span>
+        </div>
+        <div class="annot-list" id="annotList"></div>
+        <div class="annot-share-area">
+          <button class="btn-primary" id="annotShareBtn2" style="width:100%;font-size:12px;padding:8px;" disabled>🔗 공유 링크 생성</button>
+          <div class="annot-share-result" id="annotShareResult">
+            <div class="annot-share-url" id="annotShareUrl"></div>
+            <div class="annot-share-btns">
+              <button class="btn-secondary" style="flex:1;font-size:11px;padding:5px 0;" id="annotCopyBtn">복사</button>
+              <button class="btn-secondary" style="flex:1;font-size:11px;padding:5px 0;" id="annotOpenBtn">새 탭</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -592,9 +682,9 @@ async function addImageUrl() {
 
   // CDN 변환 파라미터 정리
   // crop 제거, avif→jpg 변환, optimize 제거 (CDN 프록시 URL 유지)
-  raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')  // crop 파라미터 제거
-           .replace(/\/format\/avif/, '/format/jpg')    // avif → jpg
-           .replace(/\/optimize\/?$/, '');              // optimize 제거
+  raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')
+           .replace(/\/format\/avif/, '/format/jpg')
+           .replace(/\/optimize\/?$/, '');
 
   var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
   var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';
@@ -1080,19 +1170,25 @@ function escHtml(s) {
 function switchMode(mode) {
   document.getElementById('tabInspect').classList.toggle('active', mode === 'inspect');
   document.getElementById('tabCompare').classList.toggle('active', mode === 'compare');
+  document.getElementById('tabAnnotate').classList.toggle('active', mode === 'annotate');
   var main = document.querySelector('.main');
   var bottomBar = document.querySelector('.bottom-bar');
   var compareView = document.getElementById('compareView');
+  var annotateView = document.getElementById('annotateView');
+
+  main.style.display = mode === 'inspect' ? '' : 'none';
+  bottomBar.style.display = mode === 'inspect' ? '' : 'none';
+
   if (mode === 'compare') {
-    main.style.display = 'none';
-    bottomBar.style.display = 'none';
-    compareView.style.display = 'flex';
-    compareView.classList.remove('hidden');
+    compareView.style.display = 'flex'; compareView.classList.remove('hidden');
   } else {
-    main.style.display = '';
-    bottomBar.style.display = '';
-    compareView.style.display = 'none';
-    compareView.classList.add('hidden');
+    compareView.style.display = 'none'; compareView.classList.add('hidden');
+  }
+
+  if (mode === 'annotate') {
+    annotateView.style.display = 'flex'; annotateView.classList.remove('hidden');
+  } else {
+    annotateView.style.display = 'none'; annotateView.classList.add('hidden');
   }
 }
 
@@ -1243,6 +1339,232 @@ function renderCompareResult(result) {
 
   el.innerHTML = html;
 }
+
+// ─── 주석 검토 ───────────────────────────────────────────────────────────────
+
+(function() {
+  var annotBgImage = document.getElementById('annotBgImage');
+  var annotDrawCanvas = document.getElementById('annotDrawCanvas');
+  var annotCtx = annotDrawCanvas.getContext('2d');
+  var annotImageWrapper = document.getElementById('annotImageWrapper');
+  var annotPlaceholder = document.getElementById('annotPlaceholder');
+  var annotList = document.getElementById('annotList');
+  var annotCountEl = document.getElementById('annotCount');
+
+  var annotations = [];
+  var annotNextNum = 1;
+  var annotCurrentColor = '#e53e3e';
+  var isDrawing = false;
+  var startX = 0, startY = 0;
+  var hoveredId = null;
+  var imageLoaded = false;
+
+  document.getElementById('annotColorPicker').addEventListener('click', function(e) {
+    var dot = e.target.closest('.color-dot');
+    if (!dot) return;
+    document.querySelectorAll('.color-dot').forEach(function(d) { d.classList.remove('active'); });
+    dot.classList.add('active');
+    annotCurrentColor = dot.dataset.color;
+  });
+
+  document.getElementById('annotInitFileInput').addEventListener('change', function() {
+    if (this.files[0]) loadAnnotImage(this.files[0]);
+    this.value = '';
+  });
+  document.getElementById('annotFileInput').addEventListener('change', function() {
+    if (this.files[0]) loadAnnotImage(this.files[0]);
+    this.value = '';
+  });
+  document.getElementById('annotChangeBtn').addEventListener('click', function() {
+    document.getElementById('annotFileInput').click();
+  });
+
+  function loadAnnotImage(file) {
+    var reader = new FileReader();
+    reader.onerror = function() { alert('파일을 읽을 수 없습니다.'); };
+    reader.onload = function(e) {
+      annotBgImage.onload = function() {
+        imageLoaded = true;
+        annotPlaceholder.style.display = 'none';
+        annotImageWrapper.classList.remove('no-image');
+        requestAnimationFrame(function() { requestAnimationFrame(function() {
+          syncAnnotCanvas(); annotRender();
+        }); });
+        document.getElementById('annotShareBtn').disabled = false;
+        document.getElementById('annotShareBtn2').disabled = false;
+      };
+      annotBgImage.onerror = function() { alert('이미지를 표시할 수 없습니다.'); };
+      annotBgImage.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function syncAnnotCanvas() {
+    annotDrawCanvas.width = annotBgImage.offsetWidth;
+    annotDrawCanvas.height = annotBgImage.offsetHeight;
+  }
+
+  window.addEventListener('resize', function() {
+    if (!imageLoaded) return;
+    syncAnnotCanvas(); annotRender();
+  });
+
+  function annotRender() {
+    var cw = annotDrawCanvas.width, ch = annotDrawCanvas.height;
+    annotCtx.clearRect(0, 0, cw, ch);
+    annotations.forEach(function(a) { drawAnnotBox(a, cw, ch, a.id === hoveredId); });
+  }
+
+  function drawAnnotBox(a, cw, ch, highlighted) {
+    var rx = a.x * cw, ry = a.y * ch, rw = a.width * cw, rh = a.height * ch;
+    annotCtx.save();
+    annotCtx.fillStyle = a.color;
+    annotCtx.globalAlpha = highlighted ? 0.22 : 0.12;
+    annotCtx.fillRect(rx, ry, rw, rh);
+    annotCtx.globalAlpha = 1;
+    annotCtx.strokeStyle = a.color;
+    annotCtx.lineWidth = highlighted ? 3 : 2;
+    annotCtx.strokeRect(rx, ry, rw, rh);
+    var bSize = 20, bx = rx + 2;
+    var by = ry - bSize - 2 < 0 ? ry + 2 : ry - bSize - 2;
+    annotCtx.fillStyle = a.color;
+    annotCtx.beginPath();
+    if (annotCtx.roundRect) annotCtx.roundRect(bx, by, bSize, bSize, 4);
+    else annotCtx.rect(bx, by, bSize, bSize);
+    annotCtx.fill();
+    annotCtx.fillStyle = '#fff';
+    annotCtx.font = 'bold ' + Math.round(bSize * 0.6) + 'px sans-serif';
+    annotCtx.textAlign = 'center'; annotCtx.textBaseline = 'middle';
+    annotCtx.fillText(String(a.number), bx + bSize / 2, by + bSize / 2);
+    annotCtx.restore();
+  }
+
+  annotDrawCanvas.addEventListener('mousedown', function(e) {
+    if (!imageLoaded) return;
+    var rect = annotDrawCanvas.getBoundingClientRect();
+    startX = e.clientX - rect.left; startY = e.clientY - rect.top;
+    isDrawing = true;
+  });
+
+  annotDrawCanvas.addEventListener('mousemove', function(e) {
+    var rect = annotDrawCanvas.getBoundingClientRect();
+    var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if (isDrawing) {
+      syncAnnotCanvas(); annotRender();
+      annotCtx.save();
+      annotCtx.strokeStyle = annotCurrentColor; annotCtx.lineWidth = 2;
+      annotCtx.setLineDash([6, 3]);
+      annotCtx.strokeRect(startX, startY, mx - startX, my - startY);
+      annotCtx.restore();
+    } else {
+      var found = getAnnotAt(mx, my);
+      annotDrawCanvas.style.cursor = found ? 'pointer' : 'crosshair';
+      var newId = found ? found.id : null;
+      if (newId !== hoveredId) { hoveredId = newId; annotRender(); updateAnnotHover(); }
+    }
+  });
+
+  annotDrawCanvas.addEventListener('mouseup', function(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    var rect = annotDrawCanvas.getBoundingClientRect();
+    var ex = e.clientX - rect.left, ey = e.clientY - rect.top;
+    var cw = annotDrawCanvas.width, ch = annotDrawCanvas.height;
+    var x = Math.min(startX, ex), y = Math.min(startY, ey);
+    var w = Math.abs(ex - startX), h = Math.abs(ey - startY);
+    if (w < 10 || h < 10) { annotRender(); return; }
+    var annotation = { id: Date.now(), number: annotNextNum++, color: annotCurrentColor, comment: '', x: x/cw, y: y/ch, width: w/cw, height: h/ch };
+    annotations.push(annotation);
+    annotRender(); buildAnnotList();
+    setTimeout(function() {
+      var ta = document.querySelector('.annot-card-comment[data-id="' + annotation.id + '"]');
+      if (ta) ta.focus();
+    }, 50);
+  });
+
+  annotDrawCanvas.addEventListener('mouseleave', function() {
+    if (isDrawing) { isDrawing = false; annotRender(); }
+    hoveredId = null; annotRender(); updateAnnotHover();
+  });
+
+  annotDrawCanvas.addEventListener('click', function(e) {
+    var rect = annotDrawCanvas.getBoundingClientRect();
+    var found = getAnnotAt(e.clientX - rect.left, e.clientY - rect.top);
+    if (!found) return;
+    var card = document.querySelector('.annot-card[data-id="' + found.id + '"]');
+    if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); card.classList.add('highlighted'); setTimeout(function() { card.classList.remove('highlighted'); }, 1500); }
+  });
+
+  function getAnnotAt(x, y) {
+    var cw = annotDrawCanvas.width, ch = annotDrawCanvas.height;
+    for (var i = annotations.length - 1; i >= 0; i--) {
+      var a = annotations[i];
+      if (x >= a.x*cw && x <= (a.x+a.width)*cw && y >= a.y*ch && y <= (a.y+a.height)*ch) return a;
+    }
+    return null;
+  }
+
+  function buildAnnotList() {
+    annotList.innerHTML = '';
+    annotations.forEach(function(a) {
+      var card = document.createElement('div');
+      card.className = 'annot-card'; card.dataset.id = a.id; card.style.borderLeftColor = a.color;
+      card.innerHTML =
+        '<div class="annot-card-top">' +
+          '<div class="annot-card-num" style="background:' + a.color + ';color:#fff">' + a.number + '</div>' +
+          '<div class="annot-card-label">주석 #' + a.number + '</div>' +
+          '<button class="annot-card-del" data-del="' + a.id + '" title="삭제">✕</button>' +
+        '</div>' +
+        '<textarea class="annot-card-comment" data-id="' + a.id + '" placeholder="의견을 입력하세요..." rows="2">' + escHtml(a.comment) + '</textarea>';
+      card.querySelector('.annot-card-del').addEventListener('click', function(e) { e.stopPropagation(); deleteAnnotation(a.id); });
+      card.querySelector('textarea').addEventListener('input', function() { var ann = annotations.find(function(x){return x.id===a.id;}); if(ann) ann.comment=this.value; });
+      card.addEventListener('mouseenter', function() { hoveredId = a.id; annotRender(); updateAnnotHover(); });
+      card.addEventListener('mouseleave', function() { hoveredId = null; annotRender(); updateAnnotHover(); });
+      card.addEventListener('click', function(e) { if(e.target.classList.contains('annot-card-del')||e.target.tagName==='TEXTAREA') return; scrollAnnotIntoView(a); });
+      annotList.appendChild(card);
+    });
+    annotCountEl.textContent = annotations.length + '개';
+  }
+
+  function scrollAnnotIntoView(a) {
+    var ch = annotDrawCanvas.height;
+    var canvasArea = document.getElementById('annotCanvasArea');
+    var wrapperTop = annotImageWrapper.getBoundingClientRect().top - canvasArea.getBoundingClientRect().top + canvasArea.scrollTop;
+    canvasArea.scrollTo({ top: wrapperTop + (a.y + a.height/2)*ch - canvasArea.clientHeight/2, behavior: 'smooth' });
+    hoveredId = a.id; annotRender();
+    setTimeout(function() { hoveredId = null; annotRender(); }, 1200);
+  }
+
+  function deleteAnnotation(id) {
+    annotations = annotations.filter(function(a) { return a.id !== id; });
+    annotRender(); buildAnnotList();
+  }
+
+  function updateAnnotHover() {
+    document.querySelectorAll('.annot-card').forEach(function(c) { c.classList.toggle('highlighted', Number(c.dataset.id) === hoveredId); });
+  }
+
+  function doShare() {
+    if (!imageLoaded) return;
+    var btn1 = document.getElementById('annotShareBtn'), btn2 = document.getElementById('annotShareBtn2');
+    btn1.disabled = true; btn1.textContent = '생성 중...'; btn2.disabled = true; btn2.textContent = '생성 중...';
+    fetch('/api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageDataUrl: annotBgImage.src, annotations: annotations }) })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var fullUrl = location.origin + data.url;
+      document.getElementById('annotShareUrl').textContent = fullUrl;
+      document.getElementById('annotShareResult').style.display = 'block';
+      document.getElementById('annotCopyBtn').onclick = function() { navigator.clipboard.writeText(fullUrl).then(function() { document.getElementById('annotCopyBtn').textContent = '복사됨!'; setTimeout(function(){document.getElementById('annotCopyBtn').textContent='복사';},2000); }); };
+      document.getElementById('annotOpenBtn').onclick = function() { window.open(fullUrl, '_blank'); };
+    })
+    .catch(function(e) { alert('공유 링크 생성 실패: ' + e.message); })
+    .finally(function() { btn1.disabled=false; btn1.textContent='🔗 공유 링크 생성'; btn2.disabled=false; btn2.textContent='🔗 공유 링크 생성'; });
+  }
+
+  document.getElementById('annotShareBtn').addEventListener('click', doShare);
+  document.getElementById('annotShareBtn2').addEventListener('click', doShare);
+})();
+
 </script>
 </body>
 </html>

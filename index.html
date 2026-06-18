@@ -690,10 +690,13 @@ async function addImageUrl() {
 
   for (var i = 0; i < urls.length; i++) {
     var raw = urls[i];
-    // CDN 변환 파라미터 정리: crop 제거, avif→jpg, optimize 제거
-    raw = raw.replace(/\/hdims\/crop\/[^/]+/, '/hdims')
-             .replace(/\/format\/avif/, '/format/jpg')
-             .replace(/\/optimize\/?$/, '');
+    // /hdims/ 이후를 전부 제거하고 /hdims/format/jpg만 붙임 (crop 여러 개도 처리)
+    var hdIdx = raw.indexOf('/hdims/');
+    if (hdIdx !== -1) {
+      raw = raw.slice(0, hdIdx) + '/hdims/format/jpg';
+    } else {
+      raw = raw.replace(/\/format\/avif/, '/format/jpg').replace(/\/optimize\/?$/, '');
+    }
 
     var proxyUrl = '/fetch-image?url=' + encodeURIComponent(raw);
     var name = raw.split('/').pop().split('?')[0] || 'url-image.jpg';

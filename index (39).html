@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>상세페이지 주석 검토</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; background: #f0f2f5; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── Header ── */
+    header { background: #1a1a2e; color: #fff; padding: 0 24px; height: 52px; display: flex; align-items: center; gap: 14px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+    .hdr-title { font-size: 1.05rem; font-weight: 700; flex: 1; }
+    .hdr-back { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2); color: #fff; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: .82rem; display: none; transition: background .15s; }
+    .hdr-back:hover { background: rgba(255,255,255,.2); }
+    .hdr-product-name { font-size: .95rem; font-weight: 700; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: none; }
+    .round-tabs { display: flex; gap: 4px; }
+    .round-tab { padding: 5px 14px; font-size: .82rem; font-weight: 600; border-radius: 6px; cursor: pointer; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.08); color: rgba(255,255,255,.7); transition: all .15s; }
+    .round-tab.active { background: #5b8af5; border-color: #5b8af5; color: #fff; }
+    .save-status { font-size: .75rem; color: #68d391; white-space: nowrap; min-width: 50px; }
+
+    /* ── Dashboard ── */
+    #dashboard { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+    .dash-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 14px 24px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+    .dash-bar h2 { font-size: .95rem; font-weight: 700; color: #2d3748; flex: 1; }
+    .dash-body { flex: 1; overflow-y: auto; padding: 24px; }
+    .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
+    .product-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; transition: all .18s; }
+    .product-card:hover { border-color: #5b8af5; box-shadow: 0 4px 16px rgba(91,138,245,.13); }
+    .product-card-name { font-size: .95rem; font-weight: 700; color: #1a1a2e; margin-bottom: 10px; word-break: break-all; }
+    .round-badges { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+    .round-badge { font-size: .75rem; padding: 4px 10px; border-radius: 5px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+    .round-badge.has-data { background: #f0fff4; border-color: #9ae6b4; color: #276749; }
+    .round-badge.no-data { background: #f7fafc; color: #a0aec0; }
+    .round-badge .label { font-weight: 700; }
+    .product-actions { display: flex; flex-direction: column; gap: 5px; }
+    .product-actions button { width: 100%; padding: 7px 0; font-size: .78rem; border-radius: 6px; cursor: pointer; border: 1px solid #e2e8f0; background: #f7fafc; color: #4a5568; transition: all .15s; font-family: inherit; }
+    .product-actions .btn-edit { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+    .product-actions .btn-edit:hover { background: #2d2d4e; }
+    .product-actions .btn-share:hover { border-color: #5b8af5; color: #5b8af5; }
+    .product-actions .btn-del:hover { border-color: #e53e3e; color: #e53e3e; }
+    .dash-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; color: #a0aec0; padding: 80px 20px; text-align: center; }
+    .dash-empty-icon { font-size: 52px; }
+    .btn-primary { background: #1a1a2e; color: #fff; border: none; border-radius: 7px; padding: 7px 16px; font-size: .82rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s; white-space: nowrap; }
+    .btn-primary:hover { background: #2d2d4e; }
+
+    /* ── Editor ── */
+    #editor { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+    .editor-toolbar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap; }
+    .sep { width: 1px; height: 24px; background: #e2e8f0; }
+    .color-bar { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 8px 16px; display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .color-bar label { font-size: .78rem; color: #718096; font-weight: 600; }
+    .color-btn { width: 26px; height: 26px; border-radius: 50%; border: 3px solid transparent; cursor: pointer; transition: transform .15s, border-color .15s; flex-shrink: 0; }
+    .color-btn:hover { transform: scale(1.15); }
+    .color-btn.active { border-color: #1a1a2e; transform: scale(1.2); }
+    .tool-btn { padding: 6px 12px; border: 1px solid #e2e8f0; background: #f7fafc; border-radius: 6px; font-size: .78rem; cursor: pointer; transition: all .15s; font-family: inherit; white-space: nowrap; color: #4a5568; }
+    .tool-btn:hover { border-color: #a0aec0; background: #edf2f7; }
+    .page-nav { display: flex; align-items: center; gap: 5px; }
+    .page-nav-btn { background: #f7fafc; border: 1px solid #e2e8f0; color: #4a5568; width: 28px; height: 28px; border-radius: 5px; cursor: pointer; font-size: 13px; display: flex; align-items: center; justify-content: center; transition: all .15s; }
+    .page-nav-btn:hover:not(:disabled) { border-color: #5b8af5; color: #5b8af5; }
+    .page-nav-btn:disabled { opacity: .35; cursor: default; }
+    .page-label { font-size: .78rem; color: #718096; white-space: nowrap; min-width: 48px; text-align: center; }
+
+    /* ── Thumb strip ── */
+    #thumb-strip { display: flex; gap: 6px; overflow-x: auto; padding: 8px 16px; background: #f7fafc; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+    .thumb-item { width: 44px; height: 56px; border-radius: 4px; border: 2px solid #e2e8f0; overflow: hidden; cursor: pointer; flex-shrink: 0; position: relative; background: #edf2f7; transition: border-color .15s; }
+    .thumb-item.active { border-color: #5b8af5; }
+    .thumb-item img { width: 100%; height: 100%; object-fit: cover; }
+    .thumb-item .t-num { position: absolute; bottom: 2px; right: 3px; font-size: 9px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
+
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Canvas ── */
+    #canvas-area { flex: 1; overflow: auto; padding: 24px; background: #e8ecf0; display: flex; justify-content: center; align-items: flex-start; }
+    #upload-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; border: 2.5px dashed #a0aec0; border-radius: 12px; padding: 60px 80px; background: #fff; color: #718096; cursor: pointer; transition: all .2s; min-width: 360px; position: relative; }
+    #upload-placeholder:hover { border-color: #1a1a2e; background: #f7f8ff; }
+    #upload-placeholder p { font-size: .92rem; }
+    #upload-placeholder small { font-size: .76rem; color: #a0aec0; }
+    #file-input { display: none; }
+    #image-wrapper { position: relative; display: inline-block; box-shadow: 0 4px 24px rgba(0,0,0,.18); border-radius: 4px; overflow: hidden; line-height: 0; cursor: crosshair; }
+    #image-wrapper.no-image { display: none; }
+    #bg-image { display: block; max-width: 100%; user-select: none; pointer-events: none; }
+    #draw-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+    /* ── Sidebar ── */
+    #sidebar { width: 300px; min-width: 260px; background: #f8f9fa; border-left: 1px solid #e2e8f0; display: flex; flex-direction: column; overflow: hidden; flex-shrink: 0; }
+    #sidebar-header { padding: 12px 14px; background: #fff; border-bottom: 1px solid #e2e8f0; font-size: .85rem; font-weight: 700; color: #2d3748; display: flex; justify-content: space-between; align-items: center; }
+    #annotation-count { font-size: .75rem; color: #718096; font-weight: 400; }
+    #comment-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 9px; }
+    #comment-list:empty::after { content: '주석이 없습니다.\n이미지에 박스를 그려 주세요.'; white-space: pre; display: block; text-align: center; color: #a0aec0; font-size: .78rem; margin-top: 40px; line-height: 2; }
+    .comment-card { background: #fff; border-radius: 8px; border-left: 4px solid #ccc; padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); transition: all .15s; cursor: pointer; }
+    .comment-card:hover, .comment-card.highlighted { box-shadow: 0 3px 12px rgba(0,0,0,.12); transform: translateX(2px); }
+    .comment-card.highlighted { background: #fffbe6; }
+    .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .card-num { width: 20px; height: 20px; border-radius: 50%; background: #1a1a2e; color: #fff; font-size: .68rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .card-color-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .card-label { font-size: .78rem; font-weight: 600; color: #2d3748; flex: 1; }
+    .card-delete { background: none; border: none; color: #a0aec0; cursor: pointer; font-size: .95rem; padding: 0 2px; transition: color .15s; }
+    .card-delete:hover { color: #e53e3e; }
+    .card-textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 5px; padding: 6px 8px; font-size: .76rem; font-family: inherit; resize: vertical; min-height: 54px; color: #4a5568; transition: border-color .15s; }
+    .card-textarea:focus { outline: none; border-color: #5b8af5; }
+    .card-textarea::placeholder { color: #cbd5e0; }
+
+    /* ── Share area in sidebar ── */
+    #share-area { padding: 12px 14px; border-top: 1px solid #e2e8f0; flex-shrink: 0; }
+    #share-result { margin-top: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 7px; padding: 10px 12px; display: none; }
+    .share-url { font-size: .72rem; color: #5b8af5; word-break: break-all; margin-bottom: 8px; font-family: monospace; }
+    .share-btns { display: flex; gap: 6px; }
+    .share-btns button { flex: 1; padding: 5px 0; font-size: .72rem; border-radius: 5px; cursor: pointer; border: 1px solid #e2e8f0; background: #f7fafc; color: #4a5568; transition: all .15s; font-family: inherit; }
+    .share-btns button:hover { border-color: #5b8af5; color: #5b8af5; }
+  </style>
+</head>
+<body>
+
+<header>
+  <button class="hdr-back" id="hdrBack">← 대시보드</button>
+  <span class="hdr-title" id="hdrTitle">📋 상세페이지 주석 검토</span>
+  <span class="hdr-product-name" id="hdrProductName"></span>
+  <div class="round-tabs" id="roundTabs" style="display:none">
+    <button class="round-tab active" id="roundTab1">1차</button>
+    <button class="round-tab" id="roundTab2">2차</button>
+  </div>
+  <span class="save-status" id="saveStatus"></span>
+</header>
+
+<!-- ══ 대시보드 ══ -->
+<div id="dashboard">
+  <div class="dash-bar">
+    <h2>제품 목록</h2>
+    <button class="btn-primary" id="btnNewProduct">+ 새 제품 등록</button>
+  </div>
+  <div class="dash-body">
+    <div id="product-grid" class="product-grid"></div>
+  </div>
+</div>
+
+<!-- ══ 편집기 ══ -->
+<div id="editor">
+  <div class="editor-toolbar">
+    <button class="tool-btn" id="btnAddImage">➕ 이미지 추가</button>
+    <button class="tool-btn" id="btnChangeImage">🖼 현재 변경</button>
+    <input type="file" id="file-input" accept="image/*" multiple />
+    <div class="sep"></div>
+    <div class="page-nav" id="pageNav" style="display:none">
+      <button class="page-nav-btn" id="btnPrev" disabled>◀</button>
+      <span class="page-label" id="pageLabel">1 / 1</span>
+      <button class="page-nav-btn" id="btnNext" disabled>▶</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn-primary" id="btnSave">💾 저장</button>
+    <button class="tool-btn" id="btnShare" style="border-color:#5b8af5;color:#5b8af5">🔗 공유 링크</button>
+  </div>
+  <div class="color-bar">
+    <label>색상</label>
+    <button class="color-btn active" data-color="#e53e3e" style="background:#e53e3e" title="빨강"></button>
+    <button class="color-btn" data-color="#f6ad55" style="background:#f6ad55" title="주황"></button>
+    <button class="color-btn" data-color="#4299e1" style="background:#4299e1" title="파랑"></button>
+    <button class="color-btn" data-color="#48bb78" style="background:#48bb78" title="초록"></button>
+    <button class="color-btn" data-color="#a78bfa" style="background:#a78bfa" title="보라"></button>
+  </div>
+  <div id="thumb-strip" style="display:none"></div>
+  <div id="main">
+    <div id="canvas-area">
+      <div id="upload-placeholder">
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#a0aec0" stroke-width="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+        </svg>
+        <p>클릭하거나 이미지를 드래그하여 업로드</p>
+        <small>PNG, JPG, WebP 지원 · 여러 장 선택 가능</small>
+        <input type="file" id="init-file-input" accept="image/*" multiple style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%">
+      </div>
+      <div id="image-wrapper" class="no-image">
+        <img id="bg-image" src="" alt="상세페이지" draggable="false" />
+        <canvas id="draw-canvas"></canvas>
+      </div>
+    </div>
+    <div id="sidebar">
+      <div id="sidebar-header">
+        주석 목록 <span id="annotation-count">0개</span>
+      </div>
+      <div id="comment-list"></div>
+      <div id="share-area">
+        <div id="share-result">
+          <div class="share-url" id="share-url-text"></div>
+          <div class="share-btns">
+            <button id="btn-copy">복사</button>
+            <button id="btn-open">새 탭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ── DOM ──
+  const dashboard       = document.getElementById('dashboard');
+  const editor          = document.getElementById('editor');
+  const productGrid     = document.getElementById('product-grid');
+  const hdrBack         = document.getElementById('hdrBack');
+  const hdrTitle        = document.getElementById('hdrTitle');
+  const hdrProductName  = document.getElementById('hdrProductName');
+  const roundTabsEl     = document.getElementById('roundTabs');
+  const roundTab1       = document.getElementById('roundTab1');
+  const roundTab2       = document.getElementById('roundTab2');
+  const saveStatusEl    = document.getElementById('saveStatus');
+  const fileInput       = document.getElementById('file-input');
+  const initFileInput   = document.getElementById('init-file-input');
+  const uploadPlaceholder = document.getElementById('upload-placeholder');
+  const imageWrapper    = document.getElementById('image-wrapper');
+  const bgImage         = document.getElementById('bg-image');
+  const drawCanvas      = document.getElementById('draw-canvas');
+  const ctx             = drawCanvas.getContext('2d');
+  const commentList     = document.getElementById('comment-list');
+  const annotCount      = document.getElementById('annotation-count');
+  const thumbStrip      = document.getElementById('thumb-strip');
+  const pageNav         = document.getElementById('pageNav');
+  const pageLabel       = document.getElementById('pageLabel');
+  const btnPrev         = document.getElementById('btnPrev');
+  const btnNext         = document.getElementById('btnNext');
+  const btnSave         = document.getElementById('btnSave');
+  const btnShare        = document.getElementById('btnShare');
+  const shareResult     = document.getElementById('share-result');
+  const shareUrlText    = document.getElementById('share-url-text');
+
+  // ── State ──
+  let currentProductId = null;
+  let currentProductName = '';
+  let currentRound = 1;
+  // roundData[1] and roundData[2] = { pages: [{imageDataUrl, annotations, nextNum}], nextNum }
+  let roundData = { 1: { pages: [], nextNum: 1 }, 2: { pages: [], nextNum: 1 } };
+  let pages = [];
+  let currentPageIdx = -1;
+  let annotations = [];
+  let annotNextNum = 1;
+  let currentColor = '#e53e3e';
+  let isDrawing = false;
+  let startX = 0, startY = 0;
+  let hoveredId = null;
+  let imageLoaded = false;
+
+  // ════════════════════════════════
+  //  DASHBOARD
+  // ════════════════════════════════
+
+  function showDashboard() {
+    dashboard.style.display = 'flex';
+    editor.style.display = 'none';
+    hdrBack.style.display = 'none';
+    hdrTitle.style.display = '';
+    hdrProductName.style.display = 'none';
+    roundTabsEl.style.display = 'none';
+    loadDashboard();
+  }
+
+  function loadDashboard() {
+    productGrid.innerHTML = '<div style="color:#a0aec0;font-size:.85rem;padding:20px">불러오는 중...</div>';
+    fetch('/api/products')
+      .then(r => r.json())
+      .then(list => {
+        if (!list.length) {
+          productGrid.innerHTML = '';
+          const empty = document.createElement('div');
+          empty.className = 'dash-empty';
+          empty.innerHTML = '<div class="dash-empty-icon">📦</div><div>등록된 제품이 없습니다.<br><strong>+ 새 제품 등록</strong> 버튼을 클릭하세요.</div>';
+          productGrid.appendChild(empty);
+          return;
+        }
+        productGrid.innerHTML = '';
+        list.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'product-card';
+          const r1 = p.rounds[1], r2 = p.rounds[2];
+          const badgeHtml = (round, data) => data
+            ? `<div class="round-badge has-data"><span class="label">${round}차</span><span>${data.pageCount}장 · ${data.annotCount}주석</span></div>`
+            : `<div class="round-badge no-data"><span class="label">${round}차</span><span>미등록</span></div>`;
+          card.innerHTML = `
+            <div class="product-card-name">${esc(p.name)}</div>
+            <div class="round-badges">${badgeHtml(1,r1)}${badgeHtml(2,r2)}</div>
+            <div class="product-actions">
+              <button class="btn-edit">✏️ 주석 편집</button>
+              <button class="btn-share">🔗 공유 링크 복사</button>
+              <button class="btn-del">🗑 삭제</button>
+            </div>`;
+          card.querySelector('.btn-edit').addEventListener('click', () => openEditor(p.id, p.name));
+          card.querySelector('.btn-share').addEventListener('click', () => {
+            const url = location.origin + '/view/product/' + p.id;
+            navigator.clipboard.writeText(url).then(() => alert('공유 링크가 클립보드에 복사되었습니다!\n' + url));
+          });
+          card.querySelector('.btn-del').addEventListener('click', () => {
+            if (!confirm(`"${p.name}" 제품을 삭제하시겠습니까?\n모든 주석 데이터가 삭제됩니다.`)) return;
+            fetch('/api/products/' + p.id, { method: 'DELETE' }).then(() => loadDashboard());
+          });
+          productGrid.appendChild(card);
+        });
+      })
+      .catch(e => {
+        productGrid.innerHTML = `<div class="dash-empty"><div class="dash-empty-icon">⚠️</div><div>불러오기 실패: ${esc(e.message)}</div></div>`;
+      });
+  }
+
+  document.getElementById('btnNewProduct').addEventListener('click', () => {
+    const name = prompt('제품명을 입력하세요:');
+    if (!name || !name.trim()) return;
+    fetch('/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim() })
+    }).then(r => r.json()).then(data => openEditor(data.id, data.name));
+  });
+
+  hdrBack.addEventListener('click', showDashboard);
+
+  // ════════════════════════════════
+  //  EDITOR
+  // ════════════════════════════════
+
+  function openEditor(productId, productName) {
+    currentProductId = productId;
+    currentProductName = productName;
+    dashboard.style.display = 'none';
+    editor.style.display = 'flex';
+    hdrBack.style.display = '';
+    hdrTitle.style.display = 'none';
+    hdrProductName.style.display = '';
+    hdrProductName.textContent = productName;
+    roundTabsEl.style.display = 'flex';
+    shareResult.style.display = 'none';
+
+    // Load product data
+    fetch('/api/products/' + productId)
+      .then(r => r.json())
+      .then(data => {
+        function parseRound(rd) {
+          if (!rd) return { pages: [], nextNum: 1 };
+          const max = (rd.pages || []).reduce((m, pg) =>
+            (pg.annotations || []).reduce((mm, a) => Math.max(mm, a.number || 0), m), 0);
+          return { pages: rd.pages || [], nextNum: max + 1 };
+        }
+        roundData[1] = parseRound(data.rounds && data.rounds[1]);
+        roundData[2] = parseRound(data.rounds && data.rounds[2]);
+        loadRound(1);
+      })
+      .catch(() => {
+        roundData = { 1: { pages: [], nextNum: 1 }, 2: { pages: [], nextNum: 1 } };
+        loadRound(1);
+      });
+  }
+
+  // ── Round tabs ──
+  roundTab1.addEventListener('click', () => { if (currentRound !== 1) switchRound(1); });
+  roundTab2.addEventListener('click', () => { if (currentRound !== 2) switchRound(2); });
+
+  function switchRound(round) {
+    saveCurrent();
+    loadRound(round);
+  }
+
+  function loadRound(round) {
+    currentRound = round;
+    roundTab1.classList.toggle('active', round === 1);
+    roundTab2.classList.toggle('active', round === 2);
+
+    pages = (roundData[round].pages || []).map(p => ({
+      imageDataUrl: p.imageDataUrl,
+      annotations: (p.annotations || []).slice(),
+      nextNum: p.nextNum || 1
+    }));
+    annotNextNum = roundData[round].nextNum || 1;
+
+    resetCanvas();
+    if (pages.length > 0) {
+      currentPageIdx = -1;
+      switchPage(0);
+    } else {
+      currentPageIdx = -1;
+      annotations = [];
+      buildAnnotList();
+      buildPageNav();
+      buildThumbStrip();
+    }
+  }
+
+  function resetCanvas() {
+    imageLoaded = false;
+    imageWrapper.classList.add('no-image');
+    uploadPlaceholder.style.display = '';
+    annotations = [];
+    hoveredId = null;
+    ctx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  }
+
+  // ── Save ──
+  btnSave.addEventListener('click', () => saveRound(currentRound));
+
+  function saveRound(round, cb) {
+    saveCurrent();
+    saveStatusEl.textContent = '저장 중...';
+    fetch('/api/products/' + currentProductId + '/rounds/' + round, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pages: roundData[round].pages })
+    })
+    .then(r => r.json())
+    .then(() => {
+      saveStatusEl.textContent = '저장됨 ✓';
+      setTimeout(() => saveStatusEl.textContent = '', 2500);
+      if (cb) cb();
+    })
+    .catch(e => { saveStatusEl.textContent = ''; alert('저장 실패: ' + e.message); });
+  }
+
+  // ── Share ──
+  btnShare.addEventListener('click', () => {
+    saveRound(currentRound, () => {
+      const url = location.origin + '/view/product/' + currentProductId;
+      shareUrlText.textContent = url;
+      shareResult.style.display = 'block';
+      document.getElementById('btn-copy').onclick = () => {
+        navigator.clipboard.writeText(url).then(() => {
+          document.getElementById('btn-copy').textContent = '복사됨!';
+          setTimeout(() => document.getElementById('btn-copy').textContent = '복사', 2000);
+        });
+      };
+      document.getElementById('btn-open').onclick = () => window.open(url, '_blank');
+    });
+  });
+
+  // ════════════════════════════════
+  //  IMAGE PAGES
+  // ════════════════════════════════
+
+  document.getElementById('btnAddImage').addEventListener('click', () => {
+    fileInput.multiple = true;
+    fileInput.click();
+  });
+  document.getElementById('btnChangeImage').addEventListener('click', () => {
+    fileInput.multiple = false;
+    fileInput.click();
+  });
+  fileInput.addEventListener('change', function() {
+    if (!this.files.length) { this.value = ''; return; }
+    const files = Array.from(this.files);
+    const isAdd = this.multiple;
+    readFilesSequentially(files, isAdd);
+    this.value = '';
+  });
+  initFileInput.addEventListener('change', function() {
+    if (!this.files.length) return;
+    readFilesSequentially(Array.from(this.files), true);
+    this.value = '';
+  });
+  // Drag & drop
+  document.getElementById('canvas-area').addEventListener('dragover', e => e.preventDefault());
+  document.getElementById('canvas-area').addEventListener('drop', e => {
+    e.preventDefault();
+    if (e.dataTransfer.files.length) readFilesSequentially(Array.from(e.dataTransfer.files), true);
+  });
+
+  function readFilesSequentially(files, append) {
+    let idx = 0;
+    function next() {
+      if (idx >= files.length) return;
+      const file = files[idx++];
+      if (!file.type.startsWith('image/')) { next(); return; }
+      const reader = new FileReader();
+      reader.onerror = () => { alert('파일을 읽을 수 없습니다: ' + file.name); next(); };
+      reader.onload = e => {
+        saveCurrent();
+        if (append || pages.length === 0) {
+          pages.push({ imageDataUrl: e.target.result, annotations: [], nextNum: annotNextNum });
+          switchPage(pages.length - 1, next);
+        } else {
+          pages[currentPageIdx].imageDataUrl = e.target.result;
+          switchPage(currentPageIdx, next);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    next();
+  }
+
+  function switchPage(idx, onLoaded) {
+    saveCurrent();
+    currentPageIdx = idx;
+    const page = pages[idx];
+    annotations = (page.annotations || []).slice();
+    annotNextNum = page.nextNum || annotNextNum;
+
+    bgImage.onload = () => {
+      imageLoaded = true;
+      uploadPlaceholder.style.display = 'none';
+      imageWrapper.classList.remove('no-image');
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        syncCanvasSize();
+        render();
+        buildAnnotList();
+        buildPageNav();
+        buildThumbStrip();
+        if (onLoaded) onLoaded();
+      }));
+    };
+    bgImage.onerror = () => alert('이미지를 표시할 수 없습니다.');
+    bgImage.src = page.imageDataUrl;
+  }
+
+  function saveCurrent() {
+    if (currentPageIdx >= 0 && pages.length > 0) {
+      pages[currentPageIdx].annotations = annotations.slice();
+      pages[currentPageIdx].nextNum = annotNextNum;
+    }
+    roundData[currentRound].pages = pages.map(p => ({
+      imageDataUrl: p.imageDataUrl,
+      annotations: p.annotations || [],
+      nextNum: p.nextNum || 1
+    }));
+    roundData[currentRound].nextNum = annotNextNum;
+  }
+
+  btnPrev.addEventListener('click', () => { if (currentPageIdx > 0) switchPage(currentPageIdx - 1); });
+  btnNext.addEventListener('click', () => { if (currentPageIdx < pages.length - 1) switchPage(currentPageIdx + 1); });
+
+  function buildPageNav() {
+    pageNav.style.display = pages.length >= 1 ? 'flex' : 'none';
+    pageLabel.textContent = (currentPageIdx + 1) + ' / ' + pages.length;
+    btnPrev.disabled = currentPageIdx <= 0;
+    btnNext.disabled = currentPageIdx >= pages.length - 1;
+  }
+
+  function buildThumbStrip() {
+    if (pages.length <= 1) { thumbStrip.style.display = 'none'; return; }
+    thumbStrip.style.display = 'flex';
+    thumbStrip.innerHTML = '';
+    pages.forEach((p, i) => {
+      const item = document.createElement('div');
+      item.className = 'thumb-item' + (i === currentPageIdx ? ' active' : '');
+      const img = document.createElement('img');
+      img.src = p.imageDataUrl;
+      const num = document.createElement('span');
+      num.className = 't-num'; num.textContent = i + 1;
+      item.appendChild(img); item.appendChild(num);
+      item.addEventListener('click', () => switchPage(i));
+      thumbStrip.appendChild(item);
+    });
+  }
+
+  // ════════════════════════════════
+  //  CANVAS DRAWING
+  // ════════════════════════════════
+
+  function syncCanvasSize() {
+    drawCanvas.width  = bgImage.offsetWidth;
+    drawCanvas.height = bgImage.offsetHeight;
+  }
+  window.addEventListener('resize', () => { if (imageLoaded) { syncCanvasSize(); render(); } });
+
+  document.querySelectorAll('.color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentColor = btn.dataset.color;
+    });
+  });
+
+  drawCanvas.addEventListener('mousedown', e => {
+    if (!imageLoaded) return;
+    const pos = getPos(e);
+    isDrawing = true; startX = pos.x; startY = pos.y;
+  });
+
+  drawCanvas.addEventListener('mousemove', e => {
+    if (!imageLoaded) return;
+    const pos = getPos(e);
+    if (isDrawing) {
+      syncCanvasSize(); render();
+      ctx.save();
+      ctx.strokeStyle = currentColor; ctx.lineWidth = 2;
+      ctx.setLineDash([6, 3]); ctx.globalAlpha = .8;
+      ctx.strokeRect(startX, startY, pos.x - startX, pos.y - startY);
+      ctx.fillStyle = currentColor; ctx.globalAlpha = .07;
+      ctx.fillRect(startX, startY, pos.x - startX, pos.y - startY);
+      ctx.restore();
+    } else {
+      const cw = drawCanvas.width, ch = drawCanvas.height;
+      let found = null;
+      for (let i = annotations.length - 1; i >= 0; i--) {
+        const a = annotations[i];
+        if (pos.x >= a.x*cw && pos.x <= (a.x+a.width)*cw && pos.y >= a.y*ch && pos.y <= (a.y+a.height)*ch) { found = a.id; break; }
+      }
+      drawCanvas.style.cursor = found ? 'pointer' : 'crosshair';
+      if (found !== hoveredId) { hoveredId = found; render(); updateHover(); }
+    }
+  });
+
+  drawCanvas.addEventListener('mouseup', e => {
+    if (!isDrawing) return;
+    isDrawing = false;
+    const pos = getPos(e);
+    const cw = drawCanvas.width, ch = drawCanvas.height;
+    const x = Math.min(startX, pos.x), y = Math.min(startY, pos.y);
+    const w = Math.abs(pos.x - startX), h = Math.abs(pos.y - startY);
+    if (w < 8 || h < 8) { render(); return; }
+    const annot = {
+      id: Date.now(), number: annotNextNum++, color: currentColor, comment: '',
+      x: x/cw, y: y/ch, width: w/cw, height: h/ch
+    };
+    annotations.push(annot);
+    render(); buildAnnotList();
+    setTimeout(() => {
+      const ta = document.querySelector(`[data-id="${annot.id}"] .card-textarea`);
+      if (ta) { ta.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); ta.focus(); }
+    }, 60);
+  });
+
+  drawCanvas.addEventListener('mouseleave', () => {
+    if (isDrawing) { isDrawing = false; render(); }
+    if (hoveredId !== null) { hoveredId = null; render(); updateHover(); }
+  });
+
+  drawCanvas.addEventListener('click', e => {
+    const pos = getPos(e);
+    const cw = drawCanvas.width, ch = drawCanvas.height;
+    for (let i = annotations.length - 1; i >= 0; i--) {
+      const a = annotations[i];
+      if (pos.x >= a.x*cw && pos.x <= (a.x+a.width)*cw && pos.y >= a.y*ch && pos.y <= (a.y+a.height)*ch) {
+        const card = document.querySelector(`[data-id="${a.id}"]`);
+        if (card) { card.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); card.classList.add('highlighted'); setTimeout(() => card.classList.remove('highlighted'), 1500); }
+        break;
+      }
+    }
+  });
+
+  function getPos(e) {
+    const rect = drawCanvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function render() {
+    const cw = drawCanvas.width, ch = drawCanvas.height;
+    ctx.clearRect(0, 0, cw, ch);
+    annotations.forEach(a => drawBox(a, cw, ch, a.id === hoveredId));
+  }
+
+  function drawBox(a, cw, ch, hl) {
+    const rx = a.x*cw, ry = a.y*ch, rw = a.width*cw, rh = a.height*ch;
+    ctx.save();
+    ctx.fillStyle = a.color; ctx.globalAlpha = hl ? .22 : .12;
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.globalAlpha = 1; ctx.strokeStyle = a.color;
+    ctx.lineWidth = hl ? 3 : 2; ctx.setLineDash([]);
+    ctx.strokeRect(rx, ry, rw, rh);
+    const bs = 20, bx = rx+2, by = ry-bs-2 < 0 ? ry+2 : ry-bs-2;
+    ctx.fillStyle = a.color; ctx.globalAlpha = 1;
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(bx, by, bs, bs, 4); else ctx.rect(bx, by, bs, bs);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.round(bs*.6)}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(String(a.number), bx+bs/2, by+bs/2);
+    ctx.restore();
+  }
+
+  // ════════════════════════════════
+  //  ANNOTATION LIST (SIDEBAR)
+  // ════════════════════════════════
+
+  function buildAnnotList() {
+    commentList.innerHTML = '';
+    annotations.forEach(a => {
+      const card = document.createElement('div');
+      card.className = 'comment-card'; card.dataset.id = a.id;
+      card.style.borderLeftColor = a.color;
+      card.innerHTML = `
+        <div class="card-top">
+          <div class="card-num" style="background:${a.color}">${a.number}</div>
+          <div class="card-color-dot" style="background:${a.color}"></div>
+          <div class="card-label">주석 #${a.number}</div>
+          <button class="card-delete" title="삭제">✕</button>
+        </div>
+        <textarea class="card-textarea" placeholder="의견을 입력하세요..." rows="2">${esc(a.comment)}</textarea>`;
+      card.querySelector('.card-delete').addEventListener('click', e => { e.stopPropagation(); delAnnot(a.id); });
+      card.querySelector('.card-textarea').addEventListener('input', function() {
+        const ann = annotations.find(x => x.id === a.id);
+        if (ann) ann.comment = this.value;
+      });
+      card.addEventListener('mouseenter', () => { hoveredId = a.id; render(); updateHover(); });
+      card.addEventListener('mouseleave', () => { hoveredId = null; render(); updateHover(); });
+      card.addEventListener('click', e => {
+        if (e.target.classList.contains('card-delete') || e.target.classList.contains('card-textarea')) return;
+        scrollToAnnot(a);
+      });
+      commentList.appendChild(card);
+    });
+    annotCount.textContent = annotations.length + '개';
+  }
+
+  function delAnnot(id) {
+    annotations = annotations.filter(a => a.id !== id);
+    render(); buildAnnotList();
+  }
+
+  function updateHover() {
+    document.querySelectorAll('.comment-card').forEach(c => {
+      c.classList.toggle('highlighted', Number(c.dataset.id) === hoveredId);
+    });
+  }
+
+  function scrollToAnnot(a) {
+    const ch = drawCanvas.height;
+    const boxCY = (a.y + a.height/2) * ch;
+    const area = document.getElementById('canvas-area');
+    const wt = imageWrapper.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+    area.scrollTo({ top: wt + boxCY - area.clientHeight/2, behavior: 'smooth' });
+    hoveredId = a.id; render();
+    setTimeout(() => { hoveredId = null; render(); }, 1200);
+  }
+
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Init ──
+  showDashboard();
+})();
+</script>
+</body>
+</html>

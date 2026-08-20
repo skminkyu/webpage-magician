@@ -398,6 +398,27 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
       <div class="rules-box" id="rulesSummary">카테고리를 선택하면 적용 법규 요약이 표시됩니다.</div>
       <div class="law-api-badge" id="lawApiStatus"><div class="badge-dot"></div><span>법령 API 로딩 중...</span></div>
     </div>
+
+    <!-- 화장품 카테고리 전용 패널 -->
+    <div id="cosmeticsPanel" style="display:none; border-bottom:1px solid var(--border);">
+      <div class="left-section" style="border-bottom:none;">
+        <div class="left-section-title">광고 문구 텍스트 검수 (화장품)</div>
+        <textarea id="adTextInput" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:7px;padding:8px 10px;color:var(--text);font-size:12px;resize:vertical;min-height:70px;font-family:inherit;line-height:1.5;outline:none;" placeholder="광고 문구를 직접 입력하여 검수할 수 있습니다&#10;(이미지 없이 텍스트만으로 검수)"></textarea>
+        <button id="btnTextInspect" style="margin-top:6px;width:100%;background:var(--accent);border:none;color:#fff;padding:7px 0;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;" disabled>텍스트 검수 시작</button>
+      </div>
+      <div class="left-section" style="border-bottom:none;">
+        <div class="left-section-title">지적 표현 관리 (대한화장품협회)</div>
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input id="newAdvisoryInput" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:12px;outline:none;" placeholder="새 지적표현 추가...">
+          <button id="btnAddAdvisory" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:12px;white-space:nowrap;">추가</button>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button id="btnDownloadAdvisory" style="flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 0;border-radius:6px;cursor:pointer;font-size:11px;">📥 목록 다운로드</button>
+          <span id="advisoryCount" style="font-size:11px;color:var(--text3);align-self:center;white-space:nowrap;"></span>
+        </div>
+      </div>
+    </div>
+
     <div class="left-section" style="border-bottom:none; padding-bottom:6px;">
       <div class="left-section-title">업로드된 이미지 (<span id="fileCount">0</span>)</div>
     </div>
@@ -579,6 +600,26 @@ var HFC_RULES = "[건강기능식품에 관한 법률 및 건강기능식품의 
 var CHEMICAL_RULES = "[생활화학제품 등의 표시\xB7광고에 관한 규정 / 생활화학제품 및 살생물제의 안전관리에 관한 법률 및 시행규칙]\n\n1. 효능\xB7효과 과장\xB7허위 표현 [법 제20조 제1항]\n살균율 99.9% (실증 없이), 바이러스 100% 제거, 세균 완전 박멸, 오염 완전 제거, 냄새 완전 제거, 100% 살균, 즉시 완전 살균, 영구 항균, 영구 방충, 반영구 효과\n\n2. 안전성 과장\xB7허위 표현\n무독성, 독성 없음, 인체 완전 무해, 어린이 완전 안전, 반려동물 완전 안전, 부작용 없음, 부작용 제로, 화학물질 없음, 화학성분 무첨가 (화학물질 함유 제품에), 천연 100%, 완전 유기농, 완전 자연유래\n\n3. 의약품\xB7의약외품 오인 표현 [법 제20조 제1항 제2호]\n의약품과 동일한 살균 효과, 의약외품 대체, 처방 불필요, 병원균 치료, 감염 치료\xB7예방 (질병명 명시), 코로나 예방, 독감 예방 (의약품 영역)\n\n4. 살생물제 미승인 효과 표방 [법 제20조 / 시행규칙]\n승인받지 않은 해충 방제 효과, 모기 완전 퇴치, 바퀴벌레 완전 박멸, 영구 방충, 살충 100% (승인된 살생물제 아닌 제품에)\n\n5. 인증\xB7허가 오인 표현\n환경부 인증 (받지 않은 경우), KC 인증 허위 표방, 정부 공인 (사실 아닌 경우), 국가 공인 안전제품 (근거 없이)\n\n6. 성분 허위\xB7과장 표현\n성분 함량 허위 기재, 유해물질 미검출 (검사 미실시), 중금속 없음 (실증 없이), 방부제 없음 (방부제 함유 제품에)";
 
 var COMMON_RULES = "[환경성 표시\xB7광고 관리제도에 관한 고시 (환경부, 공정거래위원회)]\n모든 상품 카테고리에 공통 적용됩니다.\n\n1. 근거 없는 환경성 표시\xB7광고 [고시 제4조]\n친환경 (실증\xB7인증 없이), 에코(Eco), 그린(Green), 자연친화, 지구친화, 환경보호 제품, 자연유래 100% (실증 없이), 지속가능 (근거 없이)\n\n2. 분해성 과장\xB7허위 표현\n생분해성 (실증 없이), 자연분해, 토양분해, 100% 분해, 완전분해, 빠른 분해 (실증 없이)\n\n3. 재활용 과장\xB7허위 표현\n100% 재활용 가능 (실증 없이), 재활용 용이 (실증 없이), 재활용 포장재 (사실 아닌 경우)\n\n4. 탄소\xB7온실가스 관련 과장 표현\n탄소중립 (인증 없이), 탄소제로, 넷제로(Net Zero) (인증 없이), 탄소발자국 0, 온실가스 없음 (실증 없이)\n\n5. 무독성\xB7무공해 과장 표현\n무공해 (실증 없이), 오염 없음 (실증 없이), 배출가스 없음 (사실 아닌 경우)\n\n6. 비교 환경성 허위\xB7과장 표현\n경쟁 제품 대비 OO% 친환경적 (실증 없이), 업계 최고 친환경, 가장 환경친화적 (실증 없이)";
+
+// 대한화장품협회 광고자문위원회 지적 표현 목록
+var COSMETICS_ADVISORY_BASE = [
+"강력한 항염작용을 가지고 있다","시어버터는 현재까진 먹거나, 발랐을 때 독소가 없는 것으로 알려져 있다","연고의 주된 성분으로 사용","벌레 물린데 바르기도 한다","치료 효과를 이용하여 피부과용 연고, 아토피치료제, 피부염 치료제로 쓰인다","세계 최초의 크림을 진귀한 원료로 재현한 크림","긁어서 생기는 2차 감염방지","긁음 방지/가려움 완화","모공각화증 개선에 도움","자외선으로 인한 손상된 피부를 완화, 칙칙한 안색과 색소 침착에 대한 고민을 해결","여드름자국, 여드름흔적, 트러블흔적자국 같은 각종 피부얼굴자국의 제거 및 예방","이런 피부에 좋아요~ 상처자국, 상처흔적, 흉터자국","꺼진 얼굴 부위를 볼록하게","얼굴 붉은기 없애는 크림","미세 염증을 완화","상처받은 입술엔 마데카솔 성분이 함유","주름 생성에 적극적으로 대처합니다, 콜라겐 합성을 유도하여 트거나 건조한 입술을 보호하고 주름을 개선시킵니다","세포활성화, 세포의 손상과 조직의 손상을 막아주어","미세 염증을 완화되도록 도와줍니다","한약처방에 대부분 들어가는 중요한 약재입니다","피부 재생","안색케어 제품, 지친 피부의 칙칙함을 정돈","기미, 잡티, 여드름자국, 여드름흔적, 트러블흔적자국 같은 각종 피부얼굴자국의 제거 및 예방","기미잡티주근깨에 효과적인, 기미제거화장품","얼굴 붉은기 없애는 크림, 붉은기얼굴 홍조","여드름자국,여드름흔적,여드름색소침착,여드름흉터","기미, 주근깨, 흉터에 효과","피부노폐물관리 (독성지방)","림프배농을 도와주어","아토피를 연구해온","스테로이드제, 항히스타민제, 항생제 등의 유독성 물질이 아닌","피부의 세포층들 내부의 지방 균형을 바로 잡아주어 혈장단백질이 스며 나오는 것을 방지","진피, 혈장단백질 삼출, 피부 복원시까지 보호막 형성","두피 면역력 강화","가려움증 완화","화사해진 피부톤, 균일한 피부톤, 활성성분들이 피부결과 피부톤 관리","심신을 최고로 아름답게 가꾸어 줍니다","파라벤류 등의 강력한 방부제 대신","칙칙한 피부톤, 불규칙적인 피부톤을 개선","남성의 고질적인 사타구니 질환으로 고생하는 환자들에게 탁월한 세정효능","씻기만 해도 해결된다는 최초의 남성청결제","특허 약용 성분 사용, 천연식물성 약용성분, 진정/항염 특허성분","피부 볼륨 개선, 꺼진 부위, 쳐진 부위의 볼륨을 채워주는데 도움","필러 효과, 비타민 볼륨 필러, 피부 볼륨 개선","항염, 소염 효과, 질염, 염증개선, 염증 완화, 상처 치유","운동 전 후의 피부에 바르면 근육 뭉침을 덜어줌","진정효과로 잘 알려진 오일들을 혼합하여 근육의 긴장을 완화시켜줌","피부재생, 재생을 도와주는 추출물 함유","해독 작용을 가지고 있고 불순물 제거","새살 크림","주름을 감소시키며 콜라겐 생성을 자극","피부세포를 활성화, 콜라겐 분비를 촉진시키는 효과","진피의 미세순환을 자극하여","아토피성 피부염의 예방 또는 치료용 조성물","無스테로이드, 스테로이드가 없어 오래써도 안전해요","여성들의 면역력 강화 및 질염 예방","가려움증 개선– 피부트러블, 건조증에 의한 가려움증","여성의 이중 턱이 없어졌습니다","세포에 대사 활동을 활발하게 하여 배설을 촉진","피부의 혈액 순환을 원활하게","주름들을 줄여주기 위해 특별 제작","더 이상 넣지 마세요, 더 이상 맞지 마세요. 이제는 필러 아이크림을 바르세요","손상된 피부 조직을 개선","97%가 피부톤이 개선","화이트닝","잡티 없이 균일하고 매끈한 피부 톤을 위한","마늘은 동의보감에도 주름 완화 및 기미 제거에 효과적이라고 나와 있고","대한 아토피 협회 아토피 안심마크 획득","상처 재생을 도와주고","무 스테로이드제, 무 스테로이드","병풀추출물 (피부재생효과– 상처 치료 연고의 주성분)","항산화 성분이 노화에 대한 저항력을 높여 피부의 면역기능을 회복시키고 멜라닌 색소의 생성을 억제","식물성 콜라겐과 고농축 히아루론산 성분이 이미 진행된 튼살 완화","마늘의 알리신 성분이 피부 속 노폐물을 배출, 탁월한 피부 노폐물 제거 효과","인체의 치유력과 신체기능을 개선","러시아 의료 과학 아카데미 톰스크 과학센터 약리학 연구소 개발","칙칙한 피부톤을 케어하고 잡티와 기미 관리에 도움","눈 주위의 주름과 미세라인을 최소화","피부 회복력, 피부 재생","항균, 항바이러스 성분 함유","당뇨발에 특화된 발관리 전용 발세정제","탈모가 많고 모발에 힘이 없으신 분","잔주름과 주름의 깊이와 관련된 매개변수가 제품 사용 후 감소","가슴을 구성하는 세포들이 활성화","다이어트로 작아진 가슴","피부볼륨감 충전 효과, 필러 후 탄력과 볼륨","바르는 보톡스라고도 불리운다","스테로이드 무검출 안정성 인증, 스테로이드 검사 완료","라벤더: 강력한 살균작용이 있어 상처 치료에도 좋다","날씬하고 울퉁불퉁 오렌지셀 집중케어","보톡스 효과를 내는","피부과 치료제와 화장품을 연구 개발하던 약사가 피부과 치료요법에 같이 사용하기 위하여","EGF는 스텐리 코헨 박사가 동물이 상처를 혀로 핥아주기만 하는데도 상처가 아무는 것에 착안","피부를 효과적으로 회복시켜 줍니다","시술 후에는 빠른 회복을 위한 재생","피부과 원장 레이저 시술 후 재생관리","거뭇거뭇한 기미를 확!, 지긋지긋한 기미","지우고 싶은 기미엔, 박박 문지르고 싶은 기미엔","국부에 가려움증, 냄새제거, 약산성유지, 국부 주변에 발진 및 가려움","몸에 유익균을 활성시키고 보호하려면 약산성을 유지하여야만 되므로","에델바이스추출물: 식물성 UVA, UVB 차단기능, 천연 썬스크린 효과","가려움 : 사용 2주 뒤 피부 가려움 39% 감소","주름의 흔적을 완화","○○○이 비듬을 방지","한의학 박사 개발자","면역과민 반응성 피부, 가려운 피부엔","항알러지 식물유래 특허 유산균 추출물이 피부유해균을 억제하고 수퍼항원을 차단"
+];
+
+// localStorage에서 사용자 추가 표현 로드
+function loadUserAdvisory() {
+  try { return JSON.parse(localStorage.getItem('cosmetics_advisory_user') || '[]'); } catch(e) { return []; }
+}
+function saveUserAdvisory(arr) {
+  localStorage.setItem('cosmetics_advisory_user', JSON.stringify(arr));
+}
+function getAllAdvisory() {
+  return COSMETICS_ADVISORY_BASE.concat(loadUserAdvisory());
+}
+function getCosmeticsAdvisoryRulesText() {
+  var all = getAllAdvisory();
+  return '[대한화장품협회 광고자문위원회 지적 표현 목록]\n아래 표현들은 협회 광고자문위원회가 지적한 위반 또는 주의 표현입니다. 이 표현과 동일하거나 유사한 의미의 표현이 발견되면 위반으로 판단하세요.\n\n' + all.map(function(e, i) { return (i+1) + '. ' + e; }).join('\n');
+}
 
 var RULES_MAP = {
   cosmetics: { rules: COSMETICS_RULES, name: '화장품', label: '화장품법 제13조 / 화장품 표시·광고 관리 지침 (식약처 2025.8.14)' },
@@ -779,6 +820,26 @@ document.addEventListener('DOMContentLoaded', function() {
   document.getElementById('btnStart').addEventListener('click', startInspection);
   document.getElementById('btnAll').addEventListener('click', inspectAll);
 
+  // 화장품 전용 패널 이벤트
+  document.getElementById('btnTextInspect').addEventListener('click', startTextInspection);
+  document.getElementById('adTextInput').addEventListener('input', function() {
+    document.getElementById('btnTextInspect').disabled = !this.value.trim() || !currentCategory || isRunning;
+  });
+  document.getElementById('btnAddAdvisory').addEventListener('click', function() {
+    var input = document.getElementById('newAdvisoryInput');
+    var val = input.value.trim();
+    if (!val) return;
+    var arr = loadUserAdvisory();
+    if (!arr.includes(val)) { arr.push(val); saveUserAdvisory(arr); }
+    input.value = '';
+    updateAdvisoryCount();
+    alert('추가되었습니다: ' + val);
+  });
+  document.getElementById('newAdvisoryInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('btnAddAdvisory').click();
+  });
+  document.getElementById('btnDownloadAdvisory').addEventListener('click', downloadAdvisoryList);
+
   document.getElementById('btnUrlAdd').addEventListener('click', addImageUrl);
   document.getElementById('urlInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') addImageUrl();
@@ -786,6 +847,76 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // ─── KEY MANAGEMENT ───────────────────────────────────────────────────────────
+
+function updateAdvisoryCount() {
+  var el = document.getElementById('advisoryCount');
+  if (!el) return;
+  var total = getAllAdvisory().length;
+  var user = loadUserAdvisory().length;
+  el.textContent = '기본 ' + COSMETICS_ADVISORY_BASE.length + ' + 추가 ' + user + ' = ' + total + '개';
+}
+
+function downloadAdvisoryList() {
+  var all = getAllAdvisory();
+  var lines = ['대한화장품협회 광고자문위원회 지적 표현 목록', '(기본 ' + COSMETICS_ADVISORY_BASE.length + '개 + 사용자 추가 ' + loadUserAdvisory().length + '개)', ''];
+  all.forEach(function(e, i) { lines.push((i + 1) + '. ' + e); });
+  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '화장품_지적표현목록.txt';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function startTextInspection() {
+  var text = document.getElementById('adTextInput').value.trim();
+  if (!text || !currentCategory || isRunning) return;
+  isRunning = true;
+  document.getElementById('btnTextInspect').disabled = true;
+  setStatus('광고 문구 검수 중...');
+
+  try {
+    var catInfo = RULES_MAP[currentCategory];
+    var advisoryBlock = currentCategory === 'cosmetics' ? '\n\n[적용 법규 3 - 대한화장품협회 광고자문위원회 지적 표현]\n' + getCosmeticsAdvisoryRulesText() : '';
+    var rulesBlock = '[적용 법규 1 - 카테고리별 규정]\n' + catInfo.rules + '\n\n[적용 법규 2 - 공통 규정]\n' + COMMON_RULES + advisoryBlock;
+    var prompt = '당신은 한국 ' + catInfo.name + ' 표시·광고 법규 전문 검수 시스템입니다.\n\n' + rulesBlock + '\n\n아래는 검수할 광고 문구 텍스트입니다:\n---\n' + text + '\n---\n\n위 법규 기준을 적용하여 금지표현 또는 위반 표현을 모두 찾아주세요.\n- 직접적인 금지표현뿐 아니라 동일한 의미를 다른 표현으로 나타난 경우도 포함합니다.\n- 영어나 한자로 표현된 경우도 포함합니다.\n\n반드시 아래 JSON 형식으로만 답변하세요:\n{\n  "violations": [\n    {\n      "forbidden_phrase": "금지 표현명",\n      "detected_text": "발견된 실제 문장 (최대 50자)",\n      "category": "위반 카테고리",\n      "law_reference": "관련 법조항",\n      "reason": "위반 사유 (1-2문장)"\n    }\n  ],\n  "ocr_length": ' + text.length + ',\n  "summary": "검수 결과 요약 (1문장)"\n}\nviolations가 없으면 빈 배열 []을 반환하세요.';
+
+    var resp = await callClaude({ model: 'claude-opus-4-8', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] });
+    var rawText = resp.content && resp.content[0] ? resp.content[0].text : '';
+    var parsed;
+    try {
+      var m = rawText.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(m ? m[0] : rawText);
+    } catch(e) { parsed = { violations: [], summary: '파싱 오류: ' + rawText.slice(0, 100) }; }
+
+    // 결과를 content-area에 표시
+    var area = document.getElementById('contentArea');
+    var n = parsed.violations ? parsed.violations.length : 0;
+    var html = '<div style="padding:16px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">📝 텍스트 검수 결과</div>';
+    html += '<div style="font-size:12px;color:var(--text2);margin-bottom:12px;">' + escHtml(parsed.summary || '') + '</div>';
+    if (n === 0) {
+      html += '<div style="color:var(--green);font-size:13px;">✅ 위반 표현 없음</div>';
+    } else {
+      html += '<div style="color:var(--red);font-size:12px;font-weight:600;margin-bottom:8px;">⚠️ 위반 ' + n + '건 발견</div>';
+      parsed.violations.forEach(function(v, i) {
+        html += '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;">';
+        html += '<div style="font-size:12px;font-weight:700;color:var(--red);margin-bottom:4px;">' + (i+1) + '. ' + escHtml(v.forbidden_phrase || '') + '</div>';
+        html += '<div style="font-size:11px;color:var(--text2);margin-bottom:3px;">발견: <span style="color:var(--yellow);">' + escHtml(v.detected_text || '') + '</span></div>';
+        html += '<div style="font-size:11px;color:var(--text3);">' + escHtml(v.law_reference || '') + ' — ' + escHtml(v.reason || '') + '</div>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    area.innerHTML = html;
+    setStatus('텍스트 검수 완료 — 위반 ' + n + '건');
+  } catch(e) {
+    setStatus('텍스트 검수 오류: ' + e.message);
+    alert('검수 오류: ' + e.message);
+  }
+  isRunning = false;
+  document.getElementById('btnTextInspect').disabled = false;
+}
 
 async function addImageUrl() {
   var raw = document.getElementById('urlInput').value.trim();
@@ -889,6 +1020,9 @@ function selectCategory(cat) {
     b.classList.toggle('active', b.dataset.cat === cat);
   });
   document.getElementById('rulesSummary').textContent = RULES_SUMMARY[cat] || '';
+  var panel = document.getElementById('cosmeticsPanel');
+  if (panel) panel.style.display = cat === 'cosmetics' ? '' : 'none';
+  updateAdvisoryCount();
   updateButtons();
   renderContent();
 }
@@ -1151,9 +1285,10 @@ async function inspectFile(f) {
     setStatus('위반 검토 중: ' + f.name);
     var catInfo = RULES_MAP[currentCategory];
     var isCommonOnly = currentCategory === 'common';
+    var advisoryBlock = currentCategory === 'cosmetics' ? '\n\n[적용 법규 3 - 대한화장품협회 광고자문위원회 지적 표현]\n' + getCosmeticsAdvisoryRulesText() : '';
     var rulesBlock = isCommonOnly
       ? '[적용 법규 - 환경성 표시·광고 관리제도에 관한 고시 (공통 적용)]\n' + COMMON_RULES
-      : '[적용 법규 1 - 카테고리별 규정]\n' + catInfo.rules + '\n\n[적용 법규 2 - 공통 규정 (모든 카테고리 적용)]\n' + COMMON_RULES;
+      : '[적용 법규 1 - 카테고리별 규정]\n' + catInfo.rules + '\n\n[적용 법규 2 - 공통 규정 (모든 카테고리 적용)]\n' + COMMON_RULES + advisoryBlock;
     var analysisPrompt = '당신은 한국 ' + catInfo.name + ' 표시\xB7광고 법규 전문 검수 시스템입니다.\n\n' + rulesBlock + '\n\n아래는 상세페이지 이미지에서 OCR로 추출한 텍스트입니다:\n---\n' + ocrText + '\n---\n\n위 법규 기준을 적용하여 OCR 텍스트에서 금지표현 또는 위반 표현을 모두 찾아주세요.\n- 직접적인 금지표현뿐 아니라 동일한 의미를 다른 표현으로 나타난 경우도 포함합니다.\n- 영어나 한자로 표현된 경우도 포함합니다.\n- 문맥과 상관없이 해당 단어/표현이 포함되면 위반으로 판단합니다.\n\n반드시 아래 JSON 형식으로만 답변하세요. 다른 설명은 일절 추가하지 마세요:\n{\n  "violations": [\n    {\n      "forbidden_phrase": "금지 표현명",\n      "detected_text": "OCR에서 발견된 실제 문장 (최대 50자)",\n      "category": "위반 카테고리",\n      "law_reference": "관련 법조항",\n      "reason": "위반 사유 (1-2문장)"\n    }\n  ],\n  "ocr_length": 추출된_텍스트_글자수,\n  "summary": "검수 결과 요약 (1문장)"\n}\nviolations가 없으면 빈 배열 []을 반환하세요.';
 
     var analysisResp = await callClaude({

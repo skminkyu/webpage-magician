@@ -858,13 +858,22 @@ function updateAdvisoryCount() {
 
 function downloadAdvisoryList() {
   var all = getAllAdvisory();
-  var lines = ['대한화장품협회 광고자문위원회 지적 표현 목록', '(기본 ' + COSMETICS_ADVISORY_BASE.length + '개 + 사용자 추가 ' + loadUserAdvisory().length + '개)', ''];
-  all.forEach(function(e, i) { lines.push((i + 1) + '. ' + e); });
-  var blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  var userCount = loadUserAdvisory().length;
+  var itemsHtml = all.map(function(e) { return '<li>' + escHtml(e) + '</li>'; }).join('');
+  var htmlDoc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="utf-8"><title>지적표현목록</title></head>'
+    + '<body style="font-family:맑은 고딕,sans-serif;">'
+    + '<h2>대한화장품협회 광고자문위원회 지적 표현 목록</h2>'
+    + '<p>기본 ' + COSMETICS_ADVISORY_BASE.length + '개 + 사용자 추가 ' + userCount + '개 = 총 ' + all.length + '개</p>'
+    + '<ol>' + itemsHtml + '</ol>'
+    + '</body></html>';
+  var blob = new Blob(['﻿', htmlDoc], { type: 'application/msword' });
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = '화장품_지적표현목록.txt';
+  a.download = 'cosmetics_advisory_list.doc';
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
 }
 

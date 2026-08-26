@@ -315,6 +315,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .annot-save-btn { background: var(--green); color: #000; border: none; padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: opacity .15s; }
 .annot-save-btn:hover { opacity: .85; }
 .annot-save-status { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.load-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; align-items:center; justify-content:center; }
+.load-overlay.show { display:flex; }
+.load-box { background:var(--bg2); border:1px solid var(--border); border-radius:14px; padding:32px 40px; text-align:center; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+.load-box .load-spinner { width:36px; height:36px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 16px; }
+.load-box .load-text { font-size:15px; font-weight:600; color:var(--text); }
+.load-box .load-sub { font-size:12px; color:var(--text3); margin-top:6px; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </style>
 </head>
@@ -492,6 +499,14 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 
 <!-- 주석 검토 뷰 -->
 <div id="annotateView" class="hidden" style="height:calc(100vh - 52px);display:none;flex-direction:column;overflow:hidden;">
+
+  <div class="load-overlay" id="loadOverlay">
+    <div class="load-box">
+      <div class="load-spinner"></div>
+      <div class="load-text">저장된 내역 불러오는 중입니다</div>
+      <div class="load-sub">잠시만 기다려 주세요...</div>
+    </div>
+  </div>
 
   <!-- 대시보드 패널 -->
   <div id="annotDashboard" class="annot-dash">
@@ -1806,7 +1821,7 @@ function renderCompareResult(result) {
   });
 
   function loadRoundData(productId, round) {
-    setSaveStatus('불러오는 중...');
+    document.getElementById('loadOverlay').classList.add('show');
     fetch('/api/products/' + productId + '/rounds/' + round)
       .then(function(r) { return r.json(); })
       .then(function(rd) {
@@ -1824,10 +1839,13 @@ function renderCompareResult(result) {
         annotCountEl.textContent = '0개';
         buildPageNav();
         buildThumbStrip();
-        setSaveStatus('');
+        document.getElementById('loadOverlay').classList.remove('show');
         if (pages.length > 0) switchPage(0);
       })
-      .catch(function(e) { setSaveStatus('로드 실패: ' + e.message); });
+      .catch(function(e) {
+        document.getElementById('loadOverlay').classList.remove('show');
+        setSaveStatus('로드 실패: ' + e.message);
+      });
   }
 
   // ── 저장 ──

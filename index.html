@@ -288,6 +288,8 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', -appl
 .annot-product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
 .annot-product-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: all .18s; }
 .annot-product-card:hover { border-color: var(--accent); box-shadow: 0 4px 16px rgba(91,138,245,.18); }
+.annot-product-card.all-done { background: rgba(30,32,42,.5); border-color: rgba(46,51,73,.5); opacity: .55; }
+.annot-product-card.all-done:hover { border-color: var(--border); box-shadow: none; opacity: .75; }
 .annot-product-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .annot-product-rounds { display: flex; gap: 8px; margin-bottom: 12px; }
 .annot-round-badge { font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 600; }
@@ -1710,7 +1712,10 @@ function renderCompareResult(result) {
           var roundKeys = Object.keys(rounds).filter(function(r) { return r !== 'null'; }).sort(function(a, b) { return Number(a) - Number(b); });
           if (roundKeys.length === 0) roundKeys = ['1', '2'];
           var card = document.createElement('div');
-          card.className = 'annot-product-card';
+          var dataRounds = roundKeys.filter(function(r) { return rounds[r]; });
+          var lastRound = dataRounds[dataRounds.length - 1];
+          var allDone = lastRound && rounds[lastRound] && rounds[lastRound].completed;
+          card.className = 'annot-product-card' + (allDone ? ' all-done' : '');
           var editColors = ['var(--accent)', 'var(--green)', '#f59e0b', '#ec4899', '#8b5cf6'];
           var badgesHtml = roundKeys.map(function(r) {
             var rd = rounds[r]; var done = rd && rd.completed;
